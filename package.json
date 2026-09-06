@@ -1,9 +1,9 @@
 {
   "name": "queue-inspect",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.0.1",
+  "description": "A terminal interface for inspecting and managing BullMQ queues in Redis.",
   "type": "module",
-  "main": "index.tsx",
+  "main": "ui/index.tsx",
   "scripts": {
     "start": "bun ./ui/index.tsx",
     "dev": "bun --watch ./ui/index.tsx",
