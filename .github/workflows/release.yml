@@ -91,7 +91,7 @@ jobs:
 
       - name: Compile executable
         run: >
-          bun build ./ui/index.tsx
+          bun build ./bin/queue-inspect.ts
           --compile
           --target=${{ matrix.target }}
           --outfile ./dist/queue-inspect
@@ -133,9 +133,33 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  publish-npm:
+    name: Publish npm package
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
+
+      - name: Publish package
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
   release:
     name: Publish release
-    needs: build
+    needs: [build, publish-npm]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
