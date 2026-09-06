@@ -4,13 +4,41 @@
   "description": "A terminal interface for inspecting and managing BullMQ queues in Redis.",
   "type": "module",
   "main": "ui/index.tsx",
+  "bin": {
+    "queue-inspect": "./bin/queue-inspect.ts"
+  },
+  "files": [
+    "bin",
+    "server",
+    "ui"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/akadotsh/tokai.git"
+  },
+  "homepage": "https://github.com/akadotsh/tokai#readme",
+  "bugs": {
+    "url": "https://github.com/akadotsh/tokai/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "bun": ">=1.4.0"
+  },
   "scripts": {
     "start": "bun ./ui/index.tsx",
     "dev": "bun --watch ./ui/index.tsx",
     "lint": "biome lint .",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
+  "keywords": [
+    "bullmq",
+    "redis",
+    "queue",
+    "terminal",
+    "tui"
+  ],
   "author": "",
   "license": "MIT",
   "packageManager": "bun@1.4.0",

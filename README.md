@@ -34,7 +34,22 @@ redis://localhost:6379
 Remote, authenticated, and TLS connections can be supplied as `redis://` or
 `rediss://` URLs.
 
-## Install from source
+## Install
+
+Install Queue Inspect globally from npm:
+
+```sh
+bun install --global queue-inspect
+queue-inspect
+```
+
+Or run it without a global installation:
+
+```sh
+bunx queue-inspect
+```
+
+To install from source instead:
 
 ```sh
 git clone https://github.com/akadotsh/tokai.git queue-inspect
@@ -44,7 +59,13 @@ bun install
 
 ## Usage
 
-Make sure Redis is running, then start Queue Inspect:
+Make sure Redis is running, then start Queue Inspect. If installed from npm, run:
+
+```sh
+queue-inspect
+```
+
+If installed from source, run:
 
 ```sh
 bun run start

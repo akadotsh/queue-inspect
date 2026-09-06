@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["ui/index.tsx"]
+  "include": ["bin/**/*.ts", "ui/index.tsx"]
 }
