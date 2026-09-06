@@ -7,7 +7,10 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "none",
+      "preset": "recommended",
+      "a11y": {
+        "noStaticElementInteractions": "off"
+      },
       "complexity": {
         "noExcessiveCognitiveComplexity": {
           "level": "error",

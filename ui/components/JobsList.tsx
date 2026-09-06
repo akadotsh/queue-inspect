@@ -42,7 +42,7 @@ export function JobSearch() {
 
     const timeout = setTimeout(() => void searchJobs(query), 300);
     return () => clearTimeout(timeout);
-  }, [isLoadingJobs, jobSearchInput, jobsSearchQuery]);
+  }, [isLoadingJobs, jobSearchInput, jobsSearchQuery, searchJobs]);
 
   const clearSearch = () => {
     if (isLoadingJobs) return;
@@ -89,11 +89,10 @@ export function JobSearch() {
 
 type JobCardProps = {
   job: QueueJobSummary;
-  index: number;
   onSelect: () => void;
 };
 
-function JobCard({ job, index, onSelect }: JobCardProps) {
+function JobCard({ job, onSelect }: JobCardProps) {
   const {
     state: { deletingJobId, retryingJobId },
     actions: { deleteJob, retryJob, openJobDetails },
@@ -111,7 +110,6 @@ function JobCard({ job, index, onSelect }: JobCardProps) {
 
   return (
     <box
-      key={`${job.status}:${job.id}:${index}`}
       width="100%"
       height={jsonHeight + 6}
       flexShrink={0}
@@ -221,11 +219,10 @@ export function JobResults({ onSelectJob }: { onSelectJob: () => void }) {
       scrollY
       contentOptions={{ flexDirection: "column", gap: 1 }}
     >
-      {jobs.map((job, index) => (
+      {jobs.map((job) => (
         <JobCard
-          key={`${job.status}:${job.id}:${index}`}
+          key={`${job.status}:${job.id}`}
           job={job}
-          index={index}
           onSelect={onSelectJob}
         />
       ))}

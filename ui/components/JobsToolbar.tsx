@@ -446,7 +446,6 @@ function QueueDialogs({ children }: { children: ReactNode }) {
       {children}
       <RateLimitDialog
         isOpen={isRateLimitOpen}
-        queueName={selectedQueue.name}
         duration={rateLimitDuration}
         error={rateLimitError}
         isPending={isRateLimitingQueue}

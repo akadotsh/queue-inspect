@@ -199,8 +199,7 @@ export function TokaiProvider({ children }: PropsWithChildren) {
     jobsSearchQuery,
     jobsStatusFilter,
     pollingIntervalMs,
-    selectedQueue?.name,
-    selectedQueue?.prefix,
+    selectedQueue,
   ]);
 
   const fetchQueues = async () => {

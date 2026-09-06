@@ -2,7 +2,6 @@ import { useKeyboard } from "@opentui/react";
 
 type RateLimitDialogProps = {
   isOpen: boolean;
-  queueName: string;
   duration: string;
   error: string;
   isPending: boolean;
@@ -13,7 +12,6 @@ type RateLimitDialogProps = {
 
 export function RateLimitDialog({
   isOpen,
-  queueName,
   duration,
   error,
   isPending,
@@ -82,9 +80,7 @@ export function RateLimitDialog({
           </box>
           <text fg="#8290AA">ms</text>
         </box>
-        <text fg={error ? "#FB7185" : "#8290AA"}>
-          {error}
-        </text>
+        <text fg={error ? "#FB7185" : "#8290AA"}>{error}</text>
         <box
           width="100%"
           height={3}

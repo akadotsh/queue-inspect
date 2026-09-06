@@ -1,6 +1,6 @@
 import { RedisClient } from "bun";
 import {
-  IRedisClient,
+  type IRedisClient,
   Queue,
   createBunRedisClient,
   type JobType,
