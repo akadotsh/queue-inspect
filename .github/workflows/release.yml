@@ -1,0 +1,167 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Verify tag matches package version
+        shell: bash
+        run: |
+          package_version="$(bun -e 'console.log((await Bun.file("package.json").json()).version)')"
+          if [[ "v${package_version}" != "${GITHUB_REF_NAME}" ]]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package version ${package_version}."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun test
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macOS Apple silicon
+            runner: macos-15
+            target: bun-darwin-arm64
+            artifact: queue-inspect-${{ github.ref_name }}-darwin-arm64
+            archive_extension: tar.gz
+          - platform: macOS Intel
+            runner: macos-15-intel
+            target: bun-darwin-x64
+            artifact: queue-inspect-${{ github.ref_name }}-darwin-x64
+            archive_extension: tar.gz
+          - platform: Linux x64
+            runner: ubuntu-24.04
+            target: bun-linux-x64-baseline
+            artifact: queue-inspect-${{ github.ref_name }}-linux-x64
+            archive_extension: tar.gz
+          - platform: Linux ARM64
+            runner: ubuntu-24.04-arm
+            target: bun-linux-arm64
+            artifact: queue-inspect-${{ github.ref_name }}-linux-arm64
+            archive_extension: tar.gz
+          - platform: Windows x64
+            runner: windows-2025
+            target: bun-windows-x64-baseline
+            artifact: queue-inspect-${{ github.ref_name }}-windows-x64
+            archive_extension: zip
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Compile executable
+        run: >
+          bun build ./ui/index.tsx
+          --compile
+          --target=${{ matrix.target }}
+          --outfile ./dist/queue-inspect
+
+      - name: Verify executable
+        if: runner.os != 'Windows'
+        shell: bash
+        run: test -x ./dist/queue-inspect
+
+      - name: Verify Windows executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Test-Path ./dist/queue-inspect.exe)) {
+            throw "Compiled Windows executable was not found."
+          }
+
+      - name: Create release archive
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p release
+          tar -C dist -czf "release/${{ matrix.artifact }}.tar.gz" queue-inspect
+
+      - name: Create Windows release archive
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release
+          Compress-Archive `
+            -Path ./dist/queue-inspect.exe `
+            -DestinationPath "release/${{ matrix.artifact }}.zip"
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: release/${{ matrix.artifact }}.${{ matrix.archive_extension }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download release archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: queue-inspect-${{ github.ref_name }}-*
+          path: release
+          merge-multiple: true
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          cd release
+          sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${GITHUB_REF_NAME}"
+          release/*.tar.gz
+          release/*.zip
+          release/SHA256SUMS
+          --verify-tag
+          --generate-notes
+          --title "Queue Inspect ${GITHUB_REF_NAME}"
