@@ -20,7 +20,7 @@ import {
   type AppState,
 } from "./reducer";
 
-type TokaiActions = {
+type QueueInspectActions = {
   setRedisUrl: (value: string) => void;
   setPollingInterval: (value: number) => void;
   connect: () => Promise<void>;
@@ -59,12 +59,12 @@ type TokaiActions = {
   obliterateQueue: () => Promise<void>;
 };
 
-type TokaiContextValue = {
+type QueueInspectContextValue = {
   state: AppState;
-  actions: TokaiActions;
+  actions: QueueInspectActions;
 };
 
-const TokaiContext = createContext<TokaiContextValue | null>(null);
+const QueueInspectContext = createContext<QueueInspectContextValue | null>(null);
 const JOBS_PAGE_SIZE = 10;
 
 type PollSelection = {
@@ -110,7 +110,7 @@ async function refreshQueuesAndJobs(
   dispatch({ type: "jobsRefreshed", queue: selectedQueue, result });
 }
 
-export function TokaiProvider({ children }: PropsWithChildren) {
+export function QueueInspectProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(
     reducer,
     redisConnection.isConnected,
@@ -791,7 +791,7 @@ export function TokaiProvider({ children }: PropsWithChildren) {
     }
   };
 
-  const actions: TokaiActions = {
+  const actions: QueueInspectActions = {
     setRedisUrl: (value) => dispatch({ type: "redisUrlChanged", value }),
     setPollingInterval: (value) =>
       dispatch({ type: "pollingIntervalChanged", value }),
@@ -823,17 +823,17 @@ export function TokaiProvider({ children }: PropsWithChildren) {
   };
 
   return (
-    <TokaiContext.Provider value={{ state, actions }}>
+    <QueueInspectContext.Provider value={{ state, actions }}>
       {children}
-    </TokaiContext.Provider>
+    </QueueInspectContext.Provider>
   );
 }
 
-export function useTokai() {
-  const context = useContext(TokaiContext);
+export function useQueueInspect() {
+  const context = useContext(QueueInspectContext);
 
   if (!context) {
-    throw new Error("useTokai must be used within TokaiProvider.");
+    throw new Error("useQueueInspect must be used within QueueInspectProvider.");
   }
 
   return context;

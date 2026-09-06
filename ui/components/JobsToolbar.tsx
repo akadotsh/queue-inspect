@@ -13,7 +13,7 @@ import {
   type JobCounts,
   type QueueJobStatus,
 } from "../../server/index";
-import { useTokai } from "../provider";
+import { useQueueInspect } from "../provider";
 import { CleanJobsDialog } from "./CleanJobsDialog";
 import { ConfirmationDialog } from "./ConfirmationDialog";
 import { ConcurrencyDialog } from "./ConcurrencyDialog";
@@ -56,7 +56,7 @@ function QueueInfoPopover({ isOpen }: { isOpen: boolean }) {
   const {
     state: { queues, selectedQueue, pollingIntervalMs },
     actions: { setPollingInterval },
-  } = useTokai();
+  } = useQueueInspect();
 
   useEffect(() => {
     if (isOpen) return;
@@ -206,7 +206,7 @@ function QueueIdentity({
   const {
     state: { selectedQueue, jobsTotal, jobsSearchQuery },
     actions: { showQueues },
-  } = useTokai();
+  } = useQueueInspect();
 
   if (!selectedQueue) return null;
 
@@ -262,7 +262,7 @@ function StatusFilter({
   const {
     state: { jobsStatusFilter },
     actions: { filterJobsByStatus },
-  } = useTokai();
+  } = useQueueInspect();
 
   const toggle = () => {
     setIsQueueInfoOpen(false);
@@ -373,7 +373,7 @@ function QueueDialogs({ children }: { children: ReactNode }) {
       retryJobs,
       obliterateQueue,
     },
-  } = useTokai();
+  } = useQueueInspect();
 
   if (!selectedQueue) return null;
 
@@ -548,7 +548,7 @@ function QueueOptions({
   const {
     state: { queues, selectedQueue, changingQueueStatus },
     actions: { setQueuePaused },
-  } = useTokai();
+  } = useQueueInspect();
   const dialogLaunchers = useContext(QueueDialogsContext);
 
   if (!selectedQueue) return null;
@@ -683,7 +683,7 @@ function Option({
 export function JobsToolbar(props: ToolbarProps) {
   const {
     actions: { openAddJob },
-  } = useTokai();
+  } = useQueueInspect();
 
   return (
     <QueueDialogs>

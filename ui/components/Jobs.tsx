@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTokai } from "../provider";
+import { useQueueInspect } from "../provider";
 import {
   JobResults,
   JobsFeedback,
@@ -15,7 +15,7 @@ export function Jobs() {
   const [isQueueInfoOpen, setIsQueueInfoOpen] = useState(false);
   const {
     state: { selectedQueue },
-  } = useTokai();
+  } = useQueueInspect();
 
   if (!selectedQueue) return null;
 

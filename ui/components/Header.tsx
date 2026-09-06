@@ -1,7 +1,7 @@
-import { useTokai } from "../provider";
+import { useQueueInspect } from "../provider";
 
 export function Header() {
-  const { disconnect } = useTokai().actions;
+  const { disconnect } = useQueueInspect().actions;
 
   return (
     <box
@@ -16,7 +16,7 @@ export function Header() {
       alignItems="center"
       justifyContent="space-between"
     >
-      <text fg="#F3F6FF">TOKAI</text>
+      <text fg="#F3F6FF">QUEUE INSPECT</text>
       <box
         width={20}
         height={3}

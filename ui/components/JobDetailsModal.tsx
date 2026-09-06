@@ -1,7 +1,7 @@
 import { SyntaxStyle } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import type { PropsWithChildren } from "react";
-import { useTokai } from "../provider";
+import { useQueueInspect } from "../provider";
 
 const jsonSyntaxStyle = SyntaxStyle.fromStyles({
   default: { fg: "#C7D2E9" },
@@ -70,7 +70,7 @@ export function JobDetailsModal() {
       jobDetailsMessage,
     },
     actions: { closeJobDetails },
-  } = useTokai();
+  } = useQueueInspect();
 
   useKeyboard((event) => {
     if (selectedJobId && event.name === "escape") {

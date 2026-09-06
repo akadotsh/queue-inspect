@@ -1,9 +1,9 @@
 import { ConnectionForm } from "./components/ConnectionForm";
 import { Layout } from "./components/Layout";
-import { useTokai } from "./provider";
+import { useQueueInspect } from "./provider";
 
 export function App() {
-  const { state } = useTokai();
+  const { state } = useQueueInspect();
 
   return state.isConnected ? <Layout /> : <ConnectionForm />;
 }

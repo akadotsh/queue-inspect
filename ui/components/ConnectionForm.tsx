@@ -1,10 +1,10 @@
-import { useTokai } from "../provider";
+import { useQueueInspect } from "../provider";
 
 export function ConnectionForm() {
   const {
     state: { redisUrl, message },
     actions: { setRedisUrl, connect },
-  } = useTokai();
+  } = useQueueInspect();
 
   return (
     <box
@@ -23,7 +23,7 @@ export function ConnectionForm() {
         flexDirection="column"
         gap={1}
       >
-        <text fg="#8EA2C9">TOKAI</text>
+        <text fg="#8EA2C9">QUEUE INSPECT</text>
         <text fg="#F3F6FF">Connect to Redis</text>
         <text fg="#8290AA">
           Enter the URL for the Redis instance you want to inspect.

@@ -1,6 +1,6 @@
 import type { TextareaRenderable } from "@opentui/core";
 import { useRef, useState } from "react";
-import { useTokai } from "../provider";
+import { useQueueInspect } from "../provider";
 
 export function AddJob() {
   const [focusedField, setFocusedField] = useState<"name" | "data">("name");
@@ -14,7 +14,7 @@ export function AddJob() {
       isAddingJob,
     },
     actions: { setNewJobName, setNewJobData, addJob, closeAddJob },
-  } = useTokai();
+  } = useQueueInspect();
 
   if (!selectedQueue) return null;
 

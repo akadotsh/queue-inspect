@@ -1,6 +1,6 @@
-# Tokai
+# Queue Inspect
 
-Tokai is a terminal interface for inspecting and managing BullMQ queues in Redis.
+Queue Inspect is a terminal interface for inspecting and managing BullMQ queues in Redis.
 
 ## Features
 

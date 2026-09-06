@@ -1,7 +1,7 @@
 import { SyntaxStyle } from "@opentui/core";
 import { useEffect, useState } from "react";
 import type { QueueJobStatus, QueueJobSummary } from "../../server/index";
-import { useTokai } from "../provider";
+import { useQueueInspect } from "../provider";
 
 const statusColors: Record<QueueJobStatus, string> = {
   completed: "#4ADE80",
@@ -33,7 +33,7 @@ export function JobSearch() {
   const {
     state: { jobsSearchQuery, isLoadingJobs },
     actions: { searchJobs },
-  } = useTokai();
+  } = useQueueInspect();
 
   useEffect(() => {
     const query = jobSearchInput.trim();
@@ -96,7 +96,7 @@ function JobCard({ job, onSelect }: JobCardProps) {
   const {
     state: { deletingJobId, retryingJobId },
     actions: { deleteJob, retryJob, openJobDetails },
-  } = useTokai();
+  } = useQueueInspect();
   const json = formatJobData(job.data);
   const jsonHeight = json.split("\n").length;
   const isDeleting = deletingJobId === job.id;
@@ -181,7 +181,7 @@ function JobCard({ job, onSelect }: JobCardProps) {
 function EmptyJobs() {
   const {
     state: { jobsSearchQuery },
-  } = useTokai();
+  } = useQueueInspect();
 
   return (
     <text fg="#8290AA">
@@ -195,7 +195,7 @@ function EmptyJobs() {
 export function JobResults({ onSelectJob }: { onSelectJob: () => void }) {
   const {
     state: { jobs, isLoadingJobs },
-  } = useTokai();
+  } = useQueueInspect();
 
   if (isLoadingJobs && jobs.length === 0) {
     return (
@@ -234,7 +234,7 @@ export function JobsPagination() {
   const {
     state: { jobsPage, hasNextJobsPage, isLoadingJobs },
     actions: { showPreviousJobsPage, showNextJobsPage },
-  } = useTokai();
+  } = useQueueInspect();
   const canShowPreviousPage = jobsPage > 1 && !isLoadingJobs;
   const canShowNextPage = hasNextJobsPage && !isLoadingJobs;
 
@@ -293,7 +293,7 @@ function isSuccessMessage(message: string) {
 export function JobsFeedback() {
   const {
     state: { isLoadingJobs, jobsMessage },
-  } = useTokai();
+  } = useQueueInspect();
 
   if (isLoadingJobs || !jobsMessage) return null;
 

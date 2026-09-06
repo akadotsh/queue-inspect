@@ -1,11 +1,11 @@
-import { useTokai } from "../provider";
+import { useQueueInspect } from "../provider";
 import { AddJob } from "./AddJob";
 import { Header } from "./Header";
 import { Jobs } from "./Jobs";
 import { Queues } from "./Queues";
 
 export function Layout() {
-  const { selectedQueue, isAddJobScreenOpen } = useTokai().state;
+  const { selectedQueue, isAddJobScreenOpen } = useQueueInspect().state;
 
   return (
     <box

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useTokai } from "../provider";
+import { useQueueInspect } from "../provider";
 
 function getMessageColor(message: string) {
   if (
@@ -24,7 +24,7 @@ export function Queues() {
   const {
     state: { queues, changingQueueStatus, message },
     actions: { fetchQueues, fetchJobs, setQueuePaused },
-  } = useTokai();
+  } = useQueueInspect();
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredQueues = normalizedSearchQuery
     ? queues.filter((queue) =>
