@@ -7,6 +7,7 @@
   "scripts": {
     "start": "bun ./ui/index.tsx",
     "dev": "bun --watch ./ui/index.tsx",
+    "lint": "biome lint .",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],
@@ -14,6 +15,7 @@
   "license": "MIT",
   "packageManager": "bun@1.4.0",
   "devDependencies": {
+    "@biomejs/biome": "2.5.12",
     "@types/bun": "^1.4.0",
     "@types/react": "^19.2.18",
     "typescript": "^5.9.3"

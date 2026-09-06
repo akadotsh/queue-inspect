@@ -226,6 +226,121 @@ class RedisConnection {
     ) as Record<QueueJobStatus, number>;
   }
 
+  private validateJobsPage(page: number, pageSize: number) {
+    if (!Number.isInteger(page) || page < 1) {
+      throw new Error("Job page must be a positive integer.");
+    }
+
+    if (!Number.isInteger(pageSize) || pageSize < 1) {
+      throw new Error("Job page size must be a positive integer.");
+    }
+  }
+
+  private async collectMatchingJobs(
+    queue: Queue,
+    status: QueueJobStatus,
+    statusCount: number,
+    normalizedQuery: string,
+    pageStart: number,
+    pageEnd: number,
+    jobs: QueueJobSummary[],
+    matchCount: number,
+  ) {
+    const batchSize = 250;
+
+    for (let start = 0; start < statusCount; start += batchSize) {
+      const batch = await queue.getJobs(
+        [status],
+        start,
+        Math.min(start + batchSize, statusCount) - 1,
+        true,
+      );
+
+      for (const job of batch) {
+        const id = job.id ?? "(no id)";
+        const matches =
+          id.toLowerCase().includes(normalizedQuery) ||
+          job.name.toLowerCase().includes(normalizedQuery);
+
+        if (!matches) continue;
+
+        if (matchCount >= pageStart && matchCount < pageEnd) {
+          jobs.push({
+            id,
+            name: job.name,
+            status,
+            timestamp: job.timestamp,
+            data: job.data,
+          });
+        }
+
+        matchCount += 1;
+      }
+    }
+
+    return matchCount;
+  }
+
+  private async getSearchedQueueJobs(
+    queue: Queue,
+    statuses: QueueJobStatus[],
+    counts: Record<string, number>,
+    normalizedQuery: string,
+    pageStart: number,
+    pageEnd: number,
+  ) {
+    const jobs: QueueJobSummary[] = [];
+    let total = 0;
+
+    for (const status of statuses) {
+      total = await this.collectMatchingJobs(
+        queue,
+        status,
+        counts[status] ?? 0,
+        normalizedQuery,
+        pageStart,
+        pageEnd,
+        jobs,
+        total,
+      );
+    }
+
+    return { jobs, total };
+  }
+
+  private async getUnfilteredQueueJobs(
+    queue: Queue,
+    statuses: QueueJobStatus[],
+    counts: Record<string, number>,
+    pageStart: number,
+    pageEnd: number,
+  ) {
+    let statusStart = 0;
+    const jobsByStatus = await Promise.all(
+      statuses.map(async (status) => {
+        const statusCount = counts[status] ?? 0;
+        const start = Math.max(0, pageStart - statusStart);
+        const end = Math.min(statusCount, pageEnd - statusStart) - 1;
+        statusStart += statusCount;
+
+        if (start > end) return [];
+
+        const jobs = await queue.getJobs([status], start, end, true);
+        return jobs.map(
+          (job): QueueJobSummary => ({
+            id: job.id ?? "(no id)",
+            name: job.name,
+            status,
+            timestamp: job.timestamp,
+            data: job.data,
+          }),
+        );
+      }),
+    );
+
+    return jobsByStatus.flat();
+  }
+
   async getQueueJobs(
     queueRef: QueueRef,
     page: number,
@@ -237,13 +352,7 @@ class RedisConnection {
       throw new Error("Connect to Redis before fetching jobs.");
     }
 
-    if (!Number.isInteger(page) || page < 1) {
-      throw new Error("Job page must be a positive integer.");
-    }
-
-    if (!Number.isInteger(pageSize) || pageSize < 1) {
-      throw new Error("Job page size must be a positive integer.");
-    }
+    this.validateJobsPage(page, pageSize);
 
     const queue = this.getQueue(queueRef);
     const statuses: QueueJobStatus[] = status
@@ -260,45 +369,14 @@ class RedisConnection {
     const normalizedQuery = query.toLowerCase();
 
     if (normalizedQuery) {
-      const jobs: QueueJobSummary[] = [];
-      let total = 0;
-      const batchSize = 250;
-
-      for (const currentStatus of statuses) {
-        const statusCount = counts[currentStatus] ?? 0;
-
-        for (let start = 0; start < statusCount; start += batchSize) {
-          const batch = await queue.getJobs(
-            [currentStatus],
-            start,
-            Math.min(start + batchSize, statusCount) - 1,
-            true,
-          );
-
-          for (const job of batch) {
-            const id = job.id ?? "(no id)";
-
-            if (
-              !id.toLowerCase().includes(normalizedQuery) &&
-              !job.name.toLowerCase().includes(normalizedQuery)
-            ) {
-              continue;
-            }
-
-            if (total >= pageStart && total < pageEnd) {
-              jobs.push({
-                id,
-                name: job.name,
-                status: currentStatus,
-                timestamp: job.timestamp,
-                data: job.data,
-              });
-            }
-
-            total += 1;
-          }
-        }
-      }
+      const { jobs, total } = await this.getSearchedQueueJobs(
+        queue,
+        statuses,
+        counts,
+        normalizedQuery,
+        pageStart,
+        pageEnd,
+      );
 
       return {
         jobs,
@@ -311,31 +389,16 @@ class RedisConnection {
       } satisfies QueueJobsPage;
     }
 
-    let statusStart = 0;
-    const jobsByStatus = await Promise.all(
-      statuses.map(async (currentStatus) => {
-        const statusCount = counts[currentStatus] ?? 0;
-        const start = Math.max(0, pageStart - statusStart);
-        const end = Math.min(statusCount, pageEnd - statusStart) - 1;
-        statusStart += statusCount;
-
-        if (start > end) return [];
-
-        const jobs = await queue.getJobs([currentStatus], start, end, true);
-        return jobs.map(
-          (job): QueueJobSummary => ({
-            id: job.id ?? "(no id)",
-            name: job.name,
-            status: currentStatus,
-            timestamp: job.timestamp,
-            data: job.data,
-          }),
-        );
-      }),
+    const jobs = await this.getUnfilteredQueueJobs(
+      queue,
+      statuses,
+      counts,
+      pageStart,
+      pageEnd,
     );
 
     return {
-      jobs: jobsByStatus.flat(),
+      jobs,
       page,
       pageSize,
       status,

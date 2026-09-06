@@ -1,7 +1,42 @@
 import type { AppAction, AppState } from "../state";
 import { isSameQueue } from "./helpers";
 
-export function reduceQueueState(state: AppState, action: AppAction): AppState {
+function resetQueueView(state: AppState): AppState {
+  return {
+    ...state,
+    selectedQueue: null,
+    jobs: [],
+    jobsPage: 1,
+    jobsTotal: 0,
+    hasNextJobsPage: false,
+    jobsStatusFilter: null,
+    jobsSearchQuery: "",
+    jobsMessage: "",
+    isLoadingJobs: false,
+    deletingJobId: null,
+    retryingJobId: null,
+    selectedJobId: null,
+    selectedJobDetails: null,
+    isLoadingJobDetails: false,
+    jobDetailsMessage: "",
+    isAddJobScreenOpen: false,
+    newJobName: "",
+    newJobData: "{}",
+    isAddingJob: false,
+    isDrainingQueue: false,
+    isCleaningJobs: false,
+    isRetryingJobs: false,
+    changingQueueStatus: null,
+    isSettingQueueConcurrency: false,
+    isRateLimitingQueue: false,
+    isObliteratingQueue: false,
+  };
+}
+
+function reduceQueueSelectionState(
+  state: AppState,
+  action: AppAction,
+): AppState {
   switch (action.type) {
     case "queuesLoading":
       return { ...state, message: "Scanning for queues..." };
@@ -21,60 +56,26 @@ export function reduceQueueState(state: AppState, action: AppAction): AppState {
     case "selectedQueueMissing":
       if (!isSameQueue(state.selectedQueue, action.queue)) return state;
       return {
-        ...state,
-        selectedQueue: null,
-        jobs: [],
-        jobsPage: 1,
-        jobsTotal: 0,
-        hasNextJobsPage: false,
-        jobsStatusFilter: null,
-        jobsSearchQuery: "",
-        jobsMessage: "",
-        isLoadingJobs: false,
-        retryingJobId: null,
-        selectedJobId: null,
-        selectedJobDetails: null,
-        isLoadingJobDetails: false,
-        jobDetailsMessage: "",
-        isAddJobScreenOpen: false,
-        newJobName: "",
-        newJobData: "{}",
-        isCleaningJobs: false,
-        isRetryingJobs: false,
-        changingQueueStatus: null,
-        isSettingQueueConcurrency: false,
+        ...resetQueueView(state),
+        deletingJobId: state.deletingJobId,
+        isAddingJob: state.isAddingJob,
+        isDrainingQueue: state.isDrainingQueue,
+        isRateLimitingQueue: state.isRateLimitingQueue,
+        isObliteratingQueue: state.isObliteratingQueue,
         message: `Queue "${action.queue.name}" is no longer available.`,
       };
     case "showQueues":
-      return {
-        ...state,
-        selectedQueue: null,
-        jobs: [],
-        jobsPage: 1,
-        jobsTotal: 0,
-        hasNextJobsPage: false,
-        jobsStatusFilter: null,
-        jobsSearchQuery: "",
-        jobsMessage: "",
-        isLoadingJobs: false,
-        deletingJobId: null,
-        retryingJobId: null,
-        selectedJobId: null,
-        selectedJobDetails: null,
-        isLoadingJobDetails: false,
-        jobDetailsMessage: "",
-        isAddJobScreenOpen: false,
-        newJobName: "",
-        newJobData: "{}",
-        isAddingJob: false,
-        isDrainingQueue: false,
-        isCleaningJobs: false,
-        isRetryingJobs: false,
-        changingQueueStatus: null,
-        isSettingQueueConcurrency: false,
-        isRateLimitingQueue: false,
-        isObliteratingQueue: false,
-      };
+      return resetQueueView(state);
+    default:
+      return state;
+  }
+}
+
+function reduceQueueJobOperations(
+  state: AppState,
+  action: AppAction,
+): AppState {
+  switch (action.type) {
     case "queueDrainStarted":
       return { ...state, isDrainingQueue: true, jobsMessage: "" };
     case "queueDrained":
@@ -89,11 +90,7 @@ export function reduceQueueState(state: AppState, action: AppAction): AppState {
         jobsMessage: `Emptied queue "${action.queue.name}".`,
       };
     case "queueDrainFailed":
-      return {
-        ...state,
-        isDrainingQueue: false,
-        jobsMessage: action.message,
-      };
+      return { ...state, isDrainingQueue: false, jobsMessage: action.message };
     case "queueCleanStarted":
       return { ...state, isCleaningJobs: true, jobsMessage: "" };
     case "queueCleaned":
@@ -111,11 +108,7 @@ export function reduceQueueState(state: AppState, action: AppAction): AppState {
         jobsMessage: `Cleaned ${action.removedCount} ${action.status} job${action.removedCount === 1 ? "" : "s"} from queue "${action.queue.name}".`,
       };
     case "queueCleanFailed":
-      return {
-        ...state,
-        isCleaningJobs: false,
-        jobsMessage: action.message,
-      };
+      return { ...state, isCleaningJobs: false, jobsMessage: action.message };
     case "jobsRetryStarted":
       return { ...state, isRetryingJobs: true, jobsMessage: "" };
     case "jobsRetried":
@@ -130,11 +123,17 @@ export function reduceQueueState(state: AppState, action: AppAction): AppState {
         jobsMessage: `Retried ${action.state} jobs in queue "${action.queue.name}".`,
       };
     case "jobsRetryFailed":
-      return {
-        ...state,
-        isRetryingJobs: false,
-        jobsMessage: action.message,
-      };
+      return { ...state, isRetryingJobs: false, jobsMessage: action.message };
+    default:
+      return state;
+  }
+}
+
+function reduceQueueSettingsState(
+  state: AppState,
+  action: AppAction,
+): AppState {
+  switch (action.type) {
     case "queueStatusChangeStarted":
       return {
         ...state,
@@ -194,6 +193,16 @@ export function reduceQueueState(state: AppState, action: AppAction): AppState {
         isRateLimitingQueue: false,
         jobsMessage: action.message,
       };
+    default:
+      return state;
+  }
+}
+
+function reduceQueueObliterateState(
+  state: AppState,
+  action: AppAction,
+): AppState {
+  switch (action.type) {
     case "queueObliterateStarted":
       return { ...state, isObliteratingQueue: true, jobsMessage: "" };
     case "queueObliterated":
@@ -230,4 +239,17 @@ export function reduceQueueState(state: AppState, action: AppAction): AppState {
     default:
       return state;
   }
+}
+
+export function reduceQueueState(state: AppState, action: AppAction): AppState {
+  return reduceQueueObliterateState(
+    reduceQueueSettingsState(
+      reduceQueueJobOperations(
+        reduceQueueSelectionState(state, action),
+        action,
+      ),
+      action,
+    ),
+    action,
+  );
 }

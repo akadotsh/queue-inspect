@@ -1,17 +1,28 @@
 import type { AppAction, AppState } from "../state";
 import { isSameQueue, jobMatchesSearch } from "./helpers";
 
-export function reduceJobState(state: AppState, action: AppAction): AppState {
+function isCurrentJobsRequest(
+  state: AppState,
+  action: Extract<AppAction, { type: "jobsLoaded" | "jobsRefreshed" }>,
+) {
+  return (
+    isSameQueue(state.selectedQueue, action.queue) &&
+    state.jobsPage === action.result.page &&
+    state.jobsStatusFilter === action.result.status &&
+    state.jobsSearchQuery === action.result.searchQuery
+  );
+}
+
+function reduceJobListState(state: AppState, action: AppAction): AppState {
   switch (action.type) {
-    case "jobsLoading":
+    case "jobsLoading": {
+      const sameQueue = isSameQueue(state.selectedQueue, action.queue);
       return {
         ...state,
         selectedQueue: action.queue,
-        jobs: isSameQueue(state.selectedQueue, action.queue) ? state.jobs : [],
+        jobs: sameQueue ? state.jobs : [],
         jobsPage: action.page,
-        jobsTotal: isSameQueue(state.selectedQueue, action.queue)
-          ? state.jobsTotal
-          : 0,
+        jobsTotal: sameQueue ? state.jobsTotal : 0,
         hasNextJobsPage: false,
         jobsStatusFilter: action.status,
         jobsSearchQuery: action.searchQuery,
@@ -22,15 +33,9 @@ export function reduceJobState(state: AppState, action: AppAction): AppState {
         newJobData: "{}",
         isAddingJob: false,
       };
+    }
     case "jobsLoaded":
-      if (
-        !isSameQueue(state.selectedQueue, action.queue) ||
-        state.jobsPage !== action.result.page ||
-        state.jobsStatusFilter !== action.result.status ||
-        state.jobsSearchQuery !== action.result.searchQuery
-      ) {
-        return state;
-      }
+      if (!isCurrentJobsRequest(state, action)) return state;
       return {
         ...state,
         jobs: action.result.jobs,
@@ -39,14 +44,7 @@ export function reduceJobState(state: AppState, action: AppAction): AppState {
         isLoadingJobs: false,
       };
     case "jobsRefreshed":
-      if (
-        !isSameQueue(state.selectedQueue, action.queue) ||
-        state.jobsPage !== action.result.page ||
-        state.jobsStatusFilter !== action.result.status ||
-        state.jobsSearchQuery !== action.result.searchQuery
-      ) {
-        return state;
-      }
+      if (!isCurrentJobsRequest(state, action)) return state;
       return {
         ...state,
         jobs: action.result.jobs,
@@ -70,6 +68,13 @@ export function reduceJobState(state: AppState, action: AppAction): AppState {
         jobsMessage: action.message,
         isLoadingJobs: false,
       };
+    default:
+      return state;
+  }
+}
+
+function reduceJobMutationState(state: AppState, action: AppAction): AppState {
+  switch (action.type) {
     case "jobDeleteStarted":
       return { ...state, deletingJobId: action.jobId, jobsMessage: "" };
     case "jobDeleted":
@@ -86,11 +91,7 @@ export function reduceJobState(state: AppState, action: AppAction): AppState {
       };
     case "jobDeleteFailed":
       if (state.deletingJobId !== action.jobId) return state;
-      return {
-        ...state,
-        deletingJobId: null,
-        jobsMessage: action.message,
-      };
+      return { ...state, deletingJobId: null, jobsMessage: action.message };
     case "jobRetryStarted":
       return { ...state, retryingJobId: action.jobId, jobsMessage: "" };
     case "jobRetried":
@@ -111,11 +112,14 @@ export function reduceJobState(state: AppState, action: AppAction): AppState {
       };
     case "jobRetryFailed":
       if (state.retryingJobId !== action.jobId) return state;
-      return {
-        ...state,
-        retryingJobId: null,
-        jobsMessage: action.message,
-      };
+      return { ...state, retryingJobId: null, jobsMessage: action.message };
+    default:
+      return state;
+  }
+}
+
+function reduceJobDetailsState(state: AppState, action: AppAction): AppState {
+  switch (action.type) {
     case "jobDetailsLoading":
       return {
         ...state,
@@ -146,6 +150,13 @@ export function reduceJobState(state: AppState, action: AppAction): AppState {
         isLoadingJobDetails: false,
         jobDetailsMessage: "",
       };
+    default:
+      return state;
+  }
+}
+
+function reduceAddJobState(state: AppState, action: AppAction): AppState {
+  switch (action.type) {
     case "addJobScreenOpened":
       return {
         ...state,
@@ -169,24 +180,34 @@ export function reduceJobState(state: AppState, action: AppAction): AppState {
       return { ...state, newJobData: action.value, jobsMessage: "" };
     case "jobAddStarted":
       return { ...state, isAddingJob: true, jobsMessage: "" };
-    case "jobAdded":
+    case "jobAdded": {
+      const matchesCurrentView =
+        (state.jobsStatusFilter === null ||
+          state.jobsStatusFilter === action.job.status) &&
+        jobMatchesSearch(action.job, state.jobsSearchQuery);
       return {
         ...state,
-        jobsTotal:
-          (state.jobsStatusFilter === null ||
-            state.jobsStatusFilter === action.job.status) &&
-          jobMatchesSearch(action.job, state.jobsSearchQuery)
-            ? state.jobsTotal + 1
-            : state.jobsTotal,
+        jobsTotal: matchesCurrentView ? state.jobsTotal + 1 : state.jobsTotal,
         isAddJobScreenOpen: false,
         newJobName: "",
         newJobData: "{}",
         isAddingJob: false,
         jobsMessage: `Added job "${action.job.name}".`,
       };
+    }
     case "jobAddFailed":
       return { ...state, isAddingJob: false, jobsMessage: action.message };
     default:
       return state;
   }
+}
+
+export function reduceJobState(state: AppState, action: AppAction): AppState {
+  return reduceAddJobState(
+    reduceJobDetailsState(
+      reduceJobMutationState(reduceJobListState(state, action), action),
+      action,
+    ),
+    action,
+  );
 }

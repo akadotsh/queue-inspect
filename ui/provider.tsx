@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useReducer,
+  type Dispatch,
   type PropsWithChildren,
 } from "react";
 import {
@@ -12,7 +13,12 @@ import {
   type QueueRef,
   type RetryableJobState,
 } from "../server/index";
-import { createInitialState, reducer, type AppState } from "./reducer";
+import {
+  createInitialState,
+  reducer,
+  type AppAction,
+  type AppState,
+} from "./reducer";
 
 type TokaiActions = {
   setRedisUrl: (value: string) => void;
@@ -60,6 +66,49 @@ type TokaiContextValue = {
 
 const TokaiContext = createContext<TokaiContextValue | null>(null);
 const JOBS_PAGE_SIZE = 10;
+
+type PollSelection = {
+  selectedQueue: QueueRef | null;
+  jobsPage: number;
+  jobsStatusFilter: QueueJobStatus | null;
+  jobsSearchQuery: string;
+};
+
+async function refreshQueuesAndJobs(
+  selection: PollSelection,
+  isActive: () => boolean,
+  dispatch: Dispatch<AppAction>,
+) {
+  const queues = await redisConnection.getQueues();
+
+  if (!isActive()) return;
+  dispatch({ type: "queuesRefreshed", queues });
+
+  const { selectedQueue } = selection;
+  if (!selectedQueue) return;
+
+  const queueStillExists = queues.some(
+    (queue) =>
+      queue.name === selectedQueue.name &&
+      queue.prefix === selectedQueue.prefix,
+  );
+
+  if (!queueStillExists) {
+    dispatch({ type: "selectedQueueMissing", queue: selectedQueue });
+    return;
+  }
+
+  const result = await redisConnection.getQueueJobs(
+    selectedQueue,
+    selection.jobsPage,
+    JOBS_PAGE_SIZE,
+    selection.jobsStatusFilter,
+    selection.jobsSearchQuery,
+  );
+
+  if (!isActive()) return;
+  dispatch({ type: "jobsRefreshed", queue: selectedQueue, result });
+}
 
 export function TokaiProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(
@@ -116,35 +165,11 @@ export function TokaiProvider({ children }: PropsWithChildren) {
       isPolling = true;
 
       try {
-        const queues = await redisConnection.getQueues();
-
-        if (!isActive) return;
-        dispatch({ type: "queuesRefreshed", queues });
-
-        if (selectedQueue) {
-          const queueStillExists = queues.some(
-            (queue) =>
-              queue.name === selectedQueue.name &&
-              queue.prefix === selectedQueue.prefix,
-          );
-
-          if (!queueStillExists) {
-            dispatch({ type: "selectedQueueMissing", queue: selectedQueue });
-            return;
-          }
-
-          const result = await redisConnection.getQueueJobs(
-            selectedQueue,
-            jobsPage,
-            JOBS_PAGE_SIZE,
-            jobsStatusFilter,
-            jobsSearchQuery,
-          );
-
-          if (isActive) {
-            dispatch({ type: "jobsRefreshed", queue: selectedQueue, result });
-          }
-        }
+        await refreshQueuesAndJobs(
+          { selectedQueue, jobsPage, jobsStatusFilter, jobsSearchQuery },
+          () => isActive,
+          dispatch,
+        );
       } catch {
         // Keep the current screen stable when a background refresh fails.
       } finally {
@@ -478,7 +503,10 @@ export function TokaiProvider({ children }: PropsWithChildren) {
     try {
       data = JSON.parse(newJobData);
     } catch {
-      dispatch({ type: "jobAddFailed", message: "Job data must be valid JSON." });
+      dispatch({
+        type: "jobAddFailed",
+        message: "Job data must be valid JSON.",
+      });
       return;
     }
 
