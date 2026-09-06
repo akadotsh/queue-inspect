@@ -52,7 +52,7 @@ bunx queue-inspect
 To install from source instead:
 
 ```sh
-git clone https://github.com/akadotsh/tokai.git queue-inspect
+git clone https://github.com/akadotsh/queue-inspect.git
 cd queue-inspect
 bun install
 ```

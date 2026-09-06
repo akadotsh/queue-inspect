@@ -14,11 +14,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/akadotsh/tokai.git"
+    "url": "git+https://github.com/akadotsh/queue-inspect.git"
   },
-  "homepage": "https://github.com/akadotsh/tokai#readme",
+  "homepage": "https://github.com/akadotsh/queue-inspect#readme",
   "bugs": {
-    "url": "https://github.com/akadotsh/tokai/issues"
+    "url": "https://github.com/akadotsh/queue-inspect/issues"
   },
   "publishConfig": {
     "access": "public"
