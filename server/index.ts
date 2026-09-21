@@ -198,15 +198,8 @@ class RedisConnection {
 
     await this.closeMissingQueues(queueRefs);
 
-    const jobCounts: JobCounts[] = await Promise.all(
-      queueRefs.map(async (queue) => {
-        const [meta, counts] = await Promise.all([
-          this.getQueueMeta(queue),
-          this.getQueueJobCounts(queue),
-        ]);
-
-        return { ...queue, meta, counts };
-      }),
+    const jobCounts = await Promise.all(
+      queueRefs.map((queue) => this.getQueueInfo(queue)),
     );
 
     return jobCounts;
@@ -224,6 +217,14 @@ class RedisConnection {
     return Object.fromEntries(
       queueJobStatuses.map((status) => [status, counts[status] ?? 0]),
     ) as Record<QueueJobStatus, number>;
+  }
+
+  async getQueueInfo(queueRef: QueueRef): Promise<JobCounts> {
+    const [meta, counts] = await Promise.all([
+      this.getQueueMeta(queueRef),
+      this.getQueueJobCounts(queueRef),
+    ]);
+    return { ...queueRef, meta, counts };
   }
 
   private validateJobsPage(page: number, pageSize: number) {
