@@ -11,7 +11,7 @@ export function AddJob() {
       newJobName,
       newJobData,
       jobsMessage,
-      isAddingJob,
+      pendingOperation,
     },
     actions: { setNewJobName, setNewJobData, addJob, closeAddJob },
   } = useQueueInspect();
@@ -104,7 +104,7 @@ export function AddJob() {
             onMouseDown={addJob}
           >
             <text fg="#FFFFFF">
-              {isAddingJob ? "Adding..." : "Add Job"}
+              {pendingOperation?.type === "addJob" ? "Adding..." : "Add Job"}
             </text>
           </box>
           <box

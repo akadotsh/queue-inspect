@@ -39,7 +39,7 @@ describe("reducer", () => {
       ...createInitialState(true),
       selectedQueue: queue,
       jobsPage: 2,
-      isLoadingJobs: true,
+      pendingOperation: { type: "jobs" as const },
     };
 
     const nextState = reducer(state, {
@@ -57,8 +57,7 @@ describe("reducer", () => {
       selectedQueue: queue,
       jobsPage: 3,
       jobsTotal: 20,
-      isSettingQueueConcurrency: true,
-      isRateLimitingQueue: true,
+      pendingOperation: { type: "setConcurrency" as const },
     };
 
     const nextState = reducer(state, { type: "showQueues" });
@@ -66,8 +65,7 @@ describe("reducer", () => {
     expect(nextState.selectedQueue).toBeNull();
     expect(nextState.jobsPage).toBe(1);
     expect(nextState.jobsTotal).toBe(0);
-    expect(nextState.isSettingQueueConcurrency).toBeFalse();
-    expect(nextState.isRateLimitingQueue).toBeFalse();
+    expect(nextState.pendingOperation).toBeNull();
   });
 
   test("updates queue metadata after setting concurrency", () => {
@@ -77,7 +75,7 @@ describe("reducer", () => {
       ...createInitialState(true),
       queues: [currentQueueInfo],
       selectedQueue: queue,
-      isSettingQueueConcurrency: true,
+      pendingOperation: { type: "setConcurrency" as const },
     };
 
     const nextState = reducer(state, {
@@ -88,7 +86,7 @@ describe("reducer", () => {
     });
 
     expect(nextState.queues).toEqual([updatedQueueInfo]);
-    expect(nextState.isSettingQueueConcurrency).toBeFalse();
+    expect(nextState.pendingOperation).toBeNull();
     expect(nextState.jobsMessage).toBe(
       'Set concurrency for queue "emails" to 8.',
     );
@@ -106,7 +104,7 @@ describe("reducer", () => {
       queues: [currentQueueInfo],
       selectedQueue: queue,
       jobsTotal: 5,
-      isCleaningJobs: true,
+      pendingOperation: { type: "cleanJobs" as const },
     };
 
     const nextState = reducer(state, {
@@ -120,7 +118,7 @@ describe("reducer", () => {
 
     expect(nextState.queues).toEqual([updatedQueueInfo]);
     expect(nextState.jobsTotal).toBe(2);
-    expect(nextState.isCleaningJobs).toBeFalse();
+    expect(nextState.pendingOperation).toBeNull();
     expect(nextState.jobsMessage).toBe(
       'Cleaned 3 completed jobs from queue "emails".',
     );

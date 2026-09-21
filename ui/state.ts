@@ -21,27 +21,31 @@ export type AppState = {
   jobsStatusFilter: QueueJobStatus | null;
   jobsSearchQuery: string;
   jobsMessage: string;
-  isLoadingJobs: boolean;
-  deletingJobId: string | null;
-  retryingJobId: string | null;
+  pendingOperation: PendingOperation;
   selectedJobId: string | null;
   selectedJobDetails: QueueJobDetails | null;
-  isLoadingJobDetails: boolean;
   jobDetailsMessage: string;
   isAddJobScreenOpen: boolean;
   newJobName: string;
   newJobData: string;
-  isAddingJob: boolean;
-  isDrainingQueue: boolean;
-  isCleaningJobs: boolean;
-  isRetryingJobs: boolean;
-  changingQueueStatus: QueueRef | null;
-  isSettingQueueConcurrency: boolean;
-  isRateLimitingQueue: boolean;
-  isObliteratingQueue: boolean;
   message: string;
   isConnected: boolean;
 };
+
+export type PendingOperation =
+  | { type: "jobs" }
+  | { type: "jobDetails"; jobId: string }
+  | { type: "deleteJob"; jobId: string }
+  | { type: "retryJob"; jobId: string }
+  | { type: "addJob" }
+  | { type: "drainQueue" }
+  | { type: "cleanJobs" }
+  | { type: "retryJobs" }
+  | { type: "queueStatus"; queue: QueueRef }
+  | { type: "setConcurrency" }
+  | { type: "rateLimit" }
+  | { type: "obliterateQueue" }
+  | null;
 
 export type AppAction =
   | { type: "redisUrlChanged"; value: string }
@@ -151,24 +155,13 @@ export function createInitialState(isConnected: boolean): AppState {
     jobsStatusFilter: null,
     jobsSearchQuery: "",
     jobsMessage: "",
-    isLoadingJobs: false,
-    deletingJobId: null,
-    retryingJobId: null,
+    pendingOperation: null,
     selectedJobId: null,
     selectedJobDetails: null,
-    isLoadingJobDetails: false,
     jobDetailsMessage: "",
     isAddJobScreenOpen: false,
     newJobName: "",
     newJobData: "{}",
-    isAddingJob: false,
-    isDrainingQueue: false,
-    isCleaningJobs: false,
-    isRetryingJobs: false,
-    changingQueueStatus: null,
-    isSettingQueueConcurrency: false,
-    isRateLimitingQueue: false,
-    isObliteratingQueue: false,
     message: "",
     isConnected,
   };

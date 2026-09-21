@@ -1,6 +1,4 @@
 import {
-  createContext,
-  useContext,
   useEffect,
   useState,
   type Dispatch,
@@ -337,9 +335,11 @@ type Launchers = {
   openObliterate: () => void;
 };
 
-const QueueDialogsContext = createContext<Launchers | null>(null);
-
-function QueueDialogs({ children }: { children: ReactNode }) {
+function QueueDialogs({
+  children,
+}: {
+  children: (launchers: Launchers) => ReactNode;
+}) {
   const [isConcurrencyOpen, setIsConcurrencyOpen] = useState(false);
   const [concurrency, setConcurrency] = useState("");
   const [concurrencyError, setConcurrencyError] = useState("");
@@ -356,15 +356,7 @@ function QueueDialogs({ children }: { children: ReactNode }) {
   const [isRetryOpen, setIsRetryOpen] = useState(false);
   const [isObliterateOpen, setIsObliterateOpen] = useState(false);
   const {
-    state: {
-      selectedQueue,
-      isSettingQueueConcurrency,
-      isRateLimitingQueue,
-      isCleaningJobs,
-      isDrainingQueue,
-      isRetryingJobs,
-      isObliteratingQueue,
-    },
+    state: { selectedQueue, pendingOperation },
     actions: {
       setQueueConcurrency,
       rateLimitQueue,
@@ -374,6 +366,12 @@ function QueueDialogs({ children }: { children: ReactNode }) {
       obliterateQueue,
     },
   } = useQueueInspect();
+  const isSettingQueueConcurrency = pendingOperation?.type === "setConcurrency";
+  const isRateLimitingQueue = pendingOperation?.type === "rateLimit";
+  const isCleaningJobs = pendingOperation?.type === "cleanJobs";
+  const isDrainingQueue = pendingOperation?.type === "drainQueue";
+  const isRetryingJobs = pendingOperation?.type === "retryJobs";
+  const isObliteratingQueue = pendingOperation?.type === "obliterateQueue";
 
   if (!selectedQueue) return null;
 
@@ -442,8 +440,8 @@ function QueueDialogs({ children }: { children: ReactNode }) {
   };
 
   return (
-    <QueueDialogsContext.Provider value={launchers}>
-      {children}
+    <>
+      {children(launchers)}
       <RateLimitDialog
         isOpen={isRateLimitOpen}
         duration={rateLimitDuration}
@@ -530,7 +528,7 @@ function QueueDialogs({ children }: { children: ReactNode }) {
           void obliterateQueue().then(() => setIsObliterateOpen(false));
         }}
       />
-    </QueueDialogsContext.Provider>
+    </>
   );
 }
 
@@ -539,17 +537,20 @@ function QueueOptions({
   setIsOpen,
   setIsQueueInfoOpen,
   setIsStatusFilterOpen,
+  dialogLaunchers,
 }: {
   isOpen: boolean;
   setIsOpen: Dispatch<SetStateAction<boolean>>;
   setIsQueueInfoOpen: Dispatch<SetStateAction<boolean>>;
   setIsStatusFilterOpen: Dispatch<SetStateAction<boolean>>;
+  dialogLaunchers: Launchers;
 }) {
   const {
-    state: { queues, selectedQueue, changingQueueStatus },
+    state: { queues, selectedQueue, pendingOperation },
     actions: { setQueuePaused },
   } = useQueueInspect();
-  const dialogLaunchers = useContext(QueueDialogsContext);
+  const changingQueueStatus =
+    pendingOperation?.type === "queueStatus" ? pendingOperation.queue : null;
 
   if (!selectedQueue) return null;
 
@@ -620,13 +621,13 @@ function QueueOptions({
           </box>
           <Option
             label="Set rate limit"
-            onSelect={() => select(() => dialogLaunchers?.openRateLimit())}
+            onSelect={() => select(dialogLaunchers.openRateLimit)}
           />
           <Option
             label="Set concurrency"
             onSelect={() =>
               select(() =>
-                dialogLaunchers?.openConcurrency(
+                dialogLaunchers.openConcurrency(
                   queueInfo?.meta.concurrency === undefined
                     ? ""
                     : String(queueInfo.meta.concurrency),
@@ -636,20 +637,20 @@ function QueueOptions({
           />
           <Option
             label="Clean jobs"
-            onSelect={() => select(() => dialogLaunchers?.openClean())}
+            onSelect={() => select(dialogLaunchers.openClean)}
           />
           <Option
             label="Empty queue"
-            onSelect={() => select(() => dialogLaunchers?.openDrain())}
+            onSelect={() => select(dialogLaunchers.openDrain)}
           />
           <Option
             label="Retry failed jobs"
-            onSelect={() => select(() => dialogLaunchers?.openRetry())}
+            onSelect={() => select(dialogLaunchers.openRetry)}
           />
           <Option
             label="Obliterate queue"
             color="#FB7185"
-            onSelect={() => select(() => dialogLaunchers?.openObliterate())}
+            onSelect={() => select(dialogLaunchers.openObliterate)}
           />
         </box>
       ) : null}
@@ -687,40 +688,43 @@ export function JobsToolbar(props: ToolbarProps) {
 
   return (
     <QueueDialogs>
-      <box
-        width="100%"
-        height={3}
-        flexDirection="row"
-        alignItems="center"
-        justifyContent="space-between"
-        zIndex={1_000}
-      >
-        <QueueIdentity {...props} />
-        <box height={3} flexDirection="row" alignItems="center" gap={1}>
-          <StatusFilter
-            isOpen={props.isStatusFilterOpen}
-            setIsOpen={props.setIsStatusFilterOpen}
-            setIsQueueInfoOpen={props.setIsQueueInfoOpen}
-            setIsQueueOptionsOpen={props.setIsQueueOptionsOpen}
-          />
-          <box
-            width={14}
-            height={3}
-            backgroundColor="#2563EB"
-            alignItems="center"
-            justifyContent="center"
-            onMouseDown={openAddJob}
-          >
-            <text fg="#FFFFFF">Add Job</text>
+      {(dialogLaunchers) => (
+        <box
+          width="100%"
+          height={3}
+          flexDirection="row"
+          alignItems="center"
+          justifyContent="space-between"
+          zIndex={1_000}
+        >
+          <QueueIdentity {...props} />
+          <box height={3} flexDirection="row" alignItems="center" gap={1}>
+            <StatusFilter
+              isOpen={props.isStatusFilterOpen}
+              setIsOpen={props.setIsStatusFilterOpen}
+              setIsQueueInfoOpen={props.setIsQueueInfoOpen}
+              setIsQueueOptionsOpen={props.setIsQueueOptionsOpen}
+            />
+            <box
+              width={14}
+              height={3}
+              backgroundColor="#2563EB"
+              alignItems="center"
+              justifyContent="center"
+              onMouseDown={openAddJob}
+            >
+              <text fg="#FFFFFF">Add Job</text>
+            </box>
+            <QueueOptions
+              isOpen={props.isQueueOptionsOpen}
+              setIsOpen={props.setIsQueueOptionsOpen}
+              setIsQueueInfoOpen={props.setIsQueueInfoOpen}
+              setIsStatusFilterOpen={props.setIsStatusFilterOpen}
+              dialogLaunchers={dialogLaunchers}
+            />
           </box>
-          <QueueOptions
-            isOpen={props.isQueueOptionsOpen}
-            setIsOpen={props.setIsQueueOptionsOpen}
-            setIsQueueInfoOpen={props.setIsQueueInfoOpen}
-            setIsStatusFilterOpen={props.setIsStatusFilterOpen}
-          />
         </box>
-      </box>
+      )}
     </QueueDialogs>
   );
 }

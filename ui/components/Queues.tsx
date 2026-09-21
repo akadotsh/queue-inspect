@@ -22,19 +22,17 @@ function getMessageColor(message: string) {
 export function Queues() {
   const [searchQuery, setSearchQuery] = useState("");
   const {
-    state: { queues, changingQueueStatus, message },
+    state: { queues, pendingOperation, message },
     actions: { fetchQueues, fetchJobs, setQueuePaused },
   } = useQueueInspect();
+  const changingQueueStatus =
+    pendingOperation?.type === "queueStatus" ? pendingOperation.queue : null;
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredQueues = normalizedSearchQuery
     ? queues.filter((queue) =>
         queue.name.toLowerCase().includes(normalizedSearchQuery),
       )
     : queues;
-  const queueRows = Array.from(
-    { length: Math.ceil(filteredQueues.length / 2) },
-    (_, index) => filteredQueues.slice(index * 2, index * 2 + 2),
-  );
 
   return (
     <box flexGrow={1} padding={2} flexDirection="column" gap={1}>
@@ -70,79 +68,70 @@ export function Queues() {
         />
       </box>
 
-      <box width="100%" flexDirection="column" gap={1}>
-        {queueRows.map((row, rowIndex) => (
+      <box width="100%" flexDirection="row" flexWrap="wrap" gap={1}>
+        {filteredQueues.map(({ name, prefix, meta, counts }) => (
           <box
-            key={row[0] ? `${row[0].prefix}:${row[0].name}` : rowIndex}
-            width="100%"
-            flexDirection="row"
-            justifyContent="space-between"
+            key={`${prefix}:${name}`}
+            width="49%"
+            height={8}
+            border
+            borderColor="#253552"
+            paddingLeft={1}
+            paddingRight={1}
+            flexDirection="column"
+            onMouseDown={() => fetchJobs({ name, prefix })}
           >
-            {row.map(({ name, prefix, meta, counts }) => (
-              <box
-                key={`${prefix}:${name}`}
-                width="49%"
-                height={8}
-                border
-                borderColor="#253552"
-                paddingLeft={1}
-                paddingRight={1}
-                flexDirection="column"
-                onMouseDown={() => fetchJobs({ name, prefix })}
-              >
-                <box
-                  width="100%"
-                  flexDirection="row"
-                  justifyContent="space-between"
-                >
-                  <box flexDirection="column">
-                    <text fg="#F3F6FF">{name}</text>
-                    {meta.paused ? <text fg="#FACC15">● Paused</text> : null}
-                  </box>
-                  <box flexDirection="row" alignItems="center" gap={2}>
-                    <box
-                      width={3}
-                      height={1}
-                      alignItems="center"
-                      justifyContent="center"
-                      onMouseDown={(event) => {
-                        event.stopPropagation();
-                        if (changingQueueStatus) return;
-                        void setQueuePaused({ name, prefix }, !meta.paused);
-                      }}
-                    >
-                      <text fg={meta.paused ? "#4ADE80" : "#FACC15"}>
-                        {changingQueueStatus?.name === name &&
-                        changingQueueStatus.prefix === prefix
-                          ? "◌"
-                          : meta.paused
-                            ? "▶"
-                            : "⏸"}
-                      </text>
-                    </box>
-                    <text fg="#8EA2C9">→</text>
-                  </box>
-                </box>
-                <box flexDirection="row" gap={2}>
-                  <text fg="#4ADE80">completed {counts.completed}</text>
-                  <text fg="#FB7185">failed {counts.failed}</text>
-                </box>
-                <box flexDirection="row" gap={2}>
-                  <text fg="#FACC15">delayed {counts.delayed}</text>
-                  <text fg="#60A5FA">active {counts.active}</text>
-                  <text fg="#C7D2E9">wait {counts.wait}</text>
-                </box>
-                <box flexDirection="row" gap={2}>
-                  <text fg="#A78BFA">
-                    waiting-children {counts["waiting-children"]}
-                  </text>
-                  <text fg="#F472B6">prioritized {counts.prioritized}</text>
-                </box>
-                <box flexDirection="row" gap={2}>
-                  <text fg="#2DD4BF">repeat {counts.repeat}</text>
-                </box>
+            <box
+              width="100%"
+              flexDirection="row"
+              justifyContent="space-between"
+            >
+              <box flexDirection="column">
+                <text fg="#F3F6FF">{name}</text>
+                {meta.paused ? <text fg="#FACC15">● Paused</text> : null}
               </box>
-            ))}
+              <box flexDirection="row" alignItems="center" gap={2}>
+                <box
+                  width={3}
+                  height={1}
+                  alignItems="center"
+                  justifyContent="center"
+                  onMouseDown={(event) => {
+                    event.stopPropagation();
+                    if (changingQueueStatus) return;
+                    void setQueuePaused({ name, prefix }, !meta.paused);
+                  }}
+                >
+                  <text fg={meta.paused ? "#4ADE80" : "#FACC15"}>
+                    {changingQueueStatus?.name === name &&
+                    changingQueueStatus.prefix === prefix
+                      ? "◌"
+                      : meta.paused
+                        ? "▶"
+                        : "⏸"}
+                  </text>
+                </box>
+                <text fg="#8EA2C9">→</text>
+              </box>
+            </box>
+            <box flexDirection="row" gap={2}>
+              <text fg="#4ADE80">completed {counts.completed}</text>
+              <text fg="#FB7185">failed {counts.failed}</text>
+            </box>
+            <box flexDirection="row" gap={2}>
+              <text fg="#FACC15">delayed {counts.delayed}</text>
+              <text fg="#60A5FA">active {counts.active}</text>
+              <text fg="#C7D2E9">wait {counts.wait}</text>
+            </box>
+            <box flexDirection="row" gap={2}>
+              <text fg="#A78BFA">
+                waiting-children {counts["waiting-children"]}
+              </text>
+              <text fg="#F472B6">prioritized {counts.prioritized}</text>
+            </box>
+            <box flexDirection="row" gap={2}>
+              <text fg="#2DD4BF">repeat {counts.repeat}</text>
+            </box>
           </box>
         ))}
         {queues.length > 0 && filteredQueues.length === 0 ? (

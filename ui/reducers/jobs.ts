@@ -1,5 +1,5 @@
 import type { AppAction, AppState } from "../state";
-import { isSameQueue, jobMatchesSearch } from "./helpers";
+import { isSameQueue, jobMatchesSearch, jobsPageState } from "./helpers";
 
 function isCurrentJobsRequest(
   state: AppState,
@@ -27,29 +27,24 @@ function reduceJobListState(state: AppState, action: AppAction): AppState {
         jobsStatusFilter: action.status,
         jobsSearchQuery: action.searchQuery,
         jobsMessage: "",
-        isLoadingJobs: true,
+        pendingOperation: { type: "jobs" },
         isAddJobScreenOpen: false,
         newJobName: "",
         newJobData: "{}",
-        isAddingJob: false,
       };
     }
     case "jobsLoaded":
       if (!isCurrentJobsRequest(state, action)) return state;
       return {
         ...state,
-        jobs: action.result.jobs,
-        jobsTotal: action.result.total,
-        hasNextJobsPage: action.result.hasNextPage,
-        isLoadingJobs: false,
+        ...jobsPageState(action.result),
+        pendingOperation: null,
       };
     case "jobsRefreshed":
       if (!isCurrentJobsRequest(state, action)) return state;
       return {
         ...state,
-        jobs: action.result.jobs,
-        jobsTotal: action.result.total,
-        hasNextJobsPage: action.result.hasNextPage,
+        ...jobsPageState(action.result),
       };
     case "jobsFailed":
       if (
@@ -66,7 +61,7 @@ function reduceJobListState(state: AppState, action: AppAction): AppState {
         jobsTotal: 0,
         hasNextJobsPage: false,
         jobsMessage: action.message,
-        isLoadingJobs: false,
+        pendingOperation: null,
       };
     default:
       return state;
@@ -76,43 +71,58 @@ function reduceJobListState(state: AppState, action: AppAction): AppState {
 function reduceJobMutationState(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case "jobDeleteStarted":
-      return { ...state, deletingJobId: action.jobId, jobsMessage: "" };
+      return {
+        ...state,
+        pendingOperation: { type: "deleteJob", jobId: action.jobId },
+        jobsMessage: "",
+      };
     case "jobDeleted":
       return {
         ...state,
         jobs: state.jobs.filter((job) => job.id !== action.jobId),
         jobsTotal: Math.max(0, state.jobsTotal - 1),
-        deletingJobId: null,
+        pendingOperation: null,
         selectedJobId: null,
         selectedJobDetails: null,
-        isLoadingJobDetails: false,
         jobDetailsMessage: "",
         jobsMessage: `Deleted job "${action.jobId}".`,
       };
     case "jobDeleteFailed":
-      if (state.deletingJobId !== action.jobId) return state;
-      return { ...state, deletingJobId: null, jobsMessage: action.message };
+      if (
+        state.pendingOperation?.type !== "deleteJob" ||
+        state.pendingOperation.jobId !== action.jobId
+      ) {
+        return state;
+      }
+      return { ...state, pendingOperation: null, jobsMessage: action.message };
     case "jobRetryStarted":
-      return { ...state, retryingJobId: action.jobId, jobsMessage: "" };
+      return {
+        ...state,
+        pendingOperation: { type: "retryJob", jobId: action.jobId },
+        jobsMessage: "",
+      };
     case "jobRetried":
       if (
         !isSameQueue(state.selectedQueue, action.queue) ||
-        state.retryingJobId !== action.jobId
+        state.pendingOperation?.type !== "retryJob" ||
+        state.pendingOperation.jobId !== action.jobId
       ) {
         return state;
       }
       return {
         ...state,
-        jobs: action.result.jobs,
-        jobsPage: action.result.page,
-        jobsTotal: action.result.total,
-        hasNextJobsPage: action.result.hasNextPage,
-        retryingJobId: null,
+        ...jobsPageState(action.result),
+        pendingOperation: null,
         jobsMessage: `Retried job "${action.jobId}".`,
       };
     case "jobRetryFailed":
-      if (state.retryingJobId !== action.jobId) return state;
-      return { ...state, retryingJobId: null, jobsMessage: action.message };
+      if (
+        state.pendingOperation?.type !== "retryJob" ||
+        state.pendingOperation.jobId !== action.jobId
+      ) {
+        return state;
+      }
+      return { ...state, pendingOperation: null, jobsMessage: action.message };
     default:
       return state;
   }
@@ -125,7 +135,7 @@ function reduceJobDetailsState(state: AppState, action: AppAction): AppState {
         ...state,
         selectedJobId: action.jobId,
         selectedJobDetails: null,
-        isLoadingJobDetails: true,
+        pendingOperation: { type: "jobDetails", jobId: action.jobId },
         jobDetailsMessage: "",
       };
     case "jobDetailsLoaded":
@@ -133,13 +143,13 @@ function reduceJobDetailsState(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         selectedJobDetails: action.details,
-        isLoadingJobDetails: false,
+        pendingOperation: null,
       };
     case "jobDetailsFailed":
       if (state.selectedJobId !== action.jobId) return state;
       return {
         ...state,
-        isLoadingJobDetails: false,
+        pendingOperation: null,
         jobDetailsMessage: action.message,
       };
     case "jobDetailsClosed":
@@ -147,7 +157,7 @@ function reduceJobDetailsState(state: AppState, action: AppAction): AppState {
         ...state,
         selectedJobId: null,
         selectedJobDetails: null,
-        isLoadingJobDetails: false,
+        pendingOperation: null,
         jobDetailsMessage: "",
       };
     default:
@@ -166,7 +176,7 @@ function reduceAddJobState(state: AppState, action: AppAction): AppState {
         jobsMessage: "",
       };
     case "addJobScreenClosed":
-      if (state.isAddingJob) return state;
+      if (state.pendingOperation?.type === "addJob") return state;
       return {
         ...state,
         isAddJobScreenOpen: false,
@@ -179,7 +189,11 @@ function reduceAddJobState(state: AppState, action: AppAction): AppState {
     case "newJobDataChanged":
       return { ...state, newJobData: action.value, jobsMessage: "" };
     case "jobAddStarted":
-      return { ...state, isAddingJob: true, jobsMessage: "" };
+      return {
+        ...state,
+        pendingOperation: { type: "addJob" },
+        jobsMessage: "",
+      };
     case "jobAdded": {
       const matchesCurrentView =
         (state.jobsStatusFilter === null ||
@@ -191,12 +205,12 @@ function reduceAddJobState(state: AppState, action: AppAction): AppState {
         isAddJobScreenOpen: false,
         newJobName: "",
         newJobData: "{}",
-        isAddingJob: false,
+        pendingOperation: null,
         jobsMessage: `Added job "${action.job.name}".`,
       };
     }
     case "jobAddFailed":
-      return { ...state, isAddingJob: false, jobsMessage: action.message };
+      return { ...state, pendingOperation: null, jobsMessage: action.message };
     default:
       return state;
   }

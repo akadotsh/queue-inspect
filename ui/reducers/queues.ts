@@ -1,5 +1,5 @@
 import type { AppAction, AppState } from "../state";
-import { isSameQueue } from "./helpers";
+import { isSameQueue, jobsPageState } from "./helpers";
 
 function resetQueueView(state: AppState): AppState {
   return {
@@ -12,24 +12,13 @@ function resetQueueView(state: AppState): AppState {
     jobsStatusFilter: null,
     jobsSearchQuery: "",
     jobsMessage: "",
-    isLoadingJobs: false,
-    deletingJobId: null,
-    retryingJobId: null,
+    pendingOperation: null,
     selectedJobId: null,
     selectedJobDetails: null,
-    isLoadingJobDetails: false,
     jobDetailsMessage: "",
     isAddJobScreenOpen: false,
     newJobName: "",
     newJobData: "{}",
-    isAddingJob: false,
-    isDrainingQueue: false,
-    isCleaningJobs: false,
-    isRetryingJobs: false,
-    changingQueueStatus: null,
-    isSettingQueueConcurrency: false,
-    isRateLimitingQueue: false,
-    isObliteratingQueue: false,
   };
 }
 
@@ -57,11 +46,6 @@ function reduceQueueSelectionState(
       if (!isSameQueue(state.selectedQueue, action.queue)) return state;
       return {
         ...resetQueueView(state),
-        deletingJobId: state.deletingJobId,
-        isAddingJob: state.isAddingJob,
-        isDrainingQueue: state.isDrainingQueue,
-        isRateLimitingQueue: state.isRateLimitingQueue,
-        isObliteratingQueue: state.isObliteratingQueue,
         message: `Queue "${action.queue.name}" is no longer available.`,
       };
     case "showQueues":
@@ -77,22 +61,27 @@ function reduceQueueJobOperations(
 ): AppState {
   switch (action.type) {
     case "queueDrainStarted":
-      return { ...state, isDrainingQueue: true, jobsMessage: "" };
+      return {
+        ...state,
+        pendingOperation: { type: "drainQueue" },
+        jobsMessage: "",
+      };
     case "queueDrained":
       if (!isSameQueue(state.selectedQueue, action.queue)) return state;
       return {
         ...state,
-        jobs: action.result.jobs,
-        jobsPage: action.result.page,
-        jobsTotal: action.result.total,
-        hasNextJobsPage: action.result.hasNextPage,
-        isDrainingQueue: false,
+        ...jobsPageState(action.result),
+        pendingOperation: null,
         jobsMessage: `Emptied queue "${action.queue.name}".`,
       };
     case "queueDrainFailed":
-      return { ...state, isDrainingQueue: false, jobsMessage: action.message };
+      return { ...state, pendingOperation: null, jobsMessage: action.message };
     case "queueCleanStarted":
-      return { ...state, isCleaningJobs: true, jobsMessage: "" };
+      return {
+        ...state,
+        pendingOperation: { type: "cleanJobs" },
+        jobsMessage: "",
+      };
     case "queueCleaned":
       if (!isSameQueue(state.selectedQueue, action.queue)) return state;
       return {
@@ -100,30 +89,28 @@ function reduceQueueJobOperations(
         queues: state.queues.map((queue) =>
           isSameQueue(queue, action.queue) ? action.queueInfo : queue,
         ),
-        jobs: action.result.jobs,
-        jobsPage: action.result.page,
-        jobsTotal: action.result.total,
-        hasNextJobsPage: action.result.hasNextPage,
-        isCleaningJobs: false,
+        ...jobsPageState(action.result),
+        pendingOperation: null,
         jobsMessage: `Cleaned ${action.removedCount} ${action.status} job${action.removedCount === 1 ? "" : "s"} from queue "${action.queue.name}".`,
       };
     case "queueCleanFailed":
-      return { ...state, isCleaningJobs: false, jobsMessage: action.message };
+      return { ...state, pendingOperation: null, jobsMessage: action.message };
     case "jobsRetryStarted":
-      return { ...state, isRetryingJobs: true, jobsMessage: "" };
+      return {
+        ...state,
+        pendingOperation: { type: "retryJobs" },
+        jobsMessage: "",
+      };
     case "jobsRetried":
       if (!isSameQueue(state.selectedQueue, action.queue)) return state;
       return {
         ...state,
-        jobs: action.result.jobs,
-        jobsPage: action.result.page,
-        jobsTotal: action.result.total,
-        hasNextJobsPage: action.result.hasNextPage,
-        isRetryingJobs: false,
+        ...jobsPageState(action.result),
+        pendingOperation: null,
         jobsMessage: `Retried ${action.state} jobs in queue "${action.queue.name}".`,
       };
     case "jobsRetryFailed":
-      return { ...state, isRetryingJobs: false, jobsMessage: action.message };
+      return { ...state, pendingOperation: null, jobsMessage: action.message };
     default:
       return state;
   }
@@ -137,31 +124,45 @@ function reduceQueueSettingsState(
     case "queueStatusChangeStarted":
       return {
         ...state,
-        changingQueueStatus: action.queue,
+        pendingOperation: { type: "queueStatus", queue: action.queue },
         jobsMessage: "",
         message: "",
       };
     case "queueStatusChanged":
-      if (!isSameQueue(state.changingQueueStatus, action.queue)) return state;
+      if (
+        state.pendingOperation?.type !== "queueStatus" ||
+        !isSameQueue(state.pendingOperation.queue, action.queue)
+      ) {
+        return state;
+      }
       return {
         ...state,
         queues: state.queues.map((queue) =>
           isSameQueue(queue, action.queue) ? action.queueInfo : queue,
         ),
-        changingQueueStatus: null,
+        pendingOperation: null,
         jobsMessage: `${action.paused ? "Paused" : "Resumed"} queue "${action.queue.name}".`,
         message: `${action.paused ? "Paused" : "Resumed"} queue "${action.queue.name}".`,
       };
     case "queueStatusChangeFailed":
-      if (!isSameQueue(state.changingQueueStatus, action.queue)) return state;
+      if (
+        state.pendingOperation?.type !== "queueStatus" ||
+        !isSameQueue(state.pendingOperation.queue, action.queue)
+      ) {
+        return state;
+      }
       return {
         ...state,
-        changingQueueStatus: null,
+        pendingOperation: null,
         jobsMessage: action.message,
         message: action.message,
       };
     case "queueConcurrencySetStarted":
-      return { ...state, isSettingQueueConcurrency: true, jobsMessage: "" };
+      return {
+        ...state,
+        pendingOperation: { type: "setConcurrency" },
+        jobsMessage: "",
+      };
     case "queueConcurrencySet":
       if (!isSameQueue(state.selectedQueue, action.queue)) return state;
       return {
@@ -169,28 +170,32 @@ function reduceQueueSettingsState(
         queues: state.queues.map((queue) =>
           isSameQueue(queue, action.queue) ? action.queueInfo : queue,
         ),
-        isSettingQueueConcurrency: false,
+        pendingOperation: null,
         jobsMessage: `Set concurrency for queue "${action.queue.name}" to ${action.concurrency}.`,
       };
     case "queueConcurrencySetFailed":
       return {
         ...state,
-        isSettingQueueConcurrency: false,
+        pendingOperation: null,
         jobsMessage: action.message,
       };
     case "queueRateLimitStarted":
-      return { ...state, isRateLimitingQueue: true, jobsMessage: "" };
+      return {
+        ...state,
+        pendingOperation: { type: "rateLimit" },
+        jobsMessage: "",
+      };
     case "queueRateLimited":
       if (!isSameQueue(state.selectedQueue, action.queue)) return state;
       return {
         ...state,
-        isRateLimitingQueue: false,
+        pendingOperation: null,
         jobsMessage: `Rate limited queue "${action.queue.name}" for ${action.durationMs} ms.`,
       };
     case "queueRateLimitFailed":
       return {
         ...state,
-        isRateLimitingQueue: false,
+        pendingOperation: null,
         jobsMessage: action.message,
       };
     default:
@@ -204,7 +209,11 @@ function reduceQueueObliterateState(
 ): AppState {
   switch (action.type) {
     case "queueObliterateStarted":
-      return { ...state, isObliteratingQueue: true, jobsMessage: "" };
+      return {
+        ...state,
+        pendingOperation: { type: "obliterateQueue" },
+        jobsMessage: "",
+      };
     case "queueObliterated":
       return {
         ...state,
@@ -220,20 +229,14 @@ function reduceQueueObliterateState(
         jobsSearchQuery: "",
         selectedJobId: null,
         selectedJobDetails: null,
-        isLoadingJobDetails: false,
         jobDetailsMessage: "",
-        retryingJobId: null,
-        isCleaningJobs: false,
-        isRetryingJobs: false,
-        changingQueueStatus: null,
-        isSettingQueueConcurrency: false,
-        isObliteratingQueue: false,
+        pendingOperation: null,
         message: `Obliterated queue "${action.queue.name}".`,
       };
     case "queueObliterateFailed":
       return {
         ...state,
-        isObliteratingQueue: false,
+        pendingOperation: null,
         jobsMessage: action.message,
       };
     default:

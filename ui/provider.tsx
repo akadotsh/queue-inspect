@@ -64,7 +64,9 @@ type QueueInspectContextValue = {
   actions: QueueInspectActions;
 };
 
-const QueueInspectContext = createContext<QueueInspectContextValue | null>(null);
+const QueueInspectContext = createContext<QueueInspectContextValue | null>(
+  null,
+);
 const JOBS_PAGE_SIZE = 10;
 
 type PollSelection = {
@@ -124,36 +126,22 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
     hasNextJobsPage,
     jobsStatusFilter,
     jobsSearchQuery,
-    isLoadingJobs,
-    deletingJobId,
-    retryingJobId,
     newJobName,
     newJobData,
-    isAddingJob,
-    isDrainingQueue,
-    isCleaningJobs,
-    isRetryingJobs,
-    changingQueueStatus,
-    isSettingQueueConcurrency,
-    isRateLimitingQueue,
-    isObliteratingQueue,
+    pendingOperation,
     isConnected,
   } = state;
+  const getCurrentJobs = (queue: QueueRef) =>
+    redisConnection.getQueueJobs(
+      queue,
+      1,
+      JOBS_PAGE_SIZE,
+      jobsStatusFilter,
+      jobsSearchQuery,
+    );
 
   useEffect(() => {
-    if (
-      !isConnected ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob ||
-      isDrainingQueue ||
-      isCleaningJobs ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isSettingQueueConcurrency ||
-      isObliteratingQueue ||
-      isLoadingJobs
-    ) {
+    if (!isConnected || pendingOperation) {
       return;
     }
 
@@ -184,21 +172,12 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
       clearInterval(interval);
     };
   }, [
-    deletingJobId,
-    retryingJobId,
-    isAddingJob,
     isConnected,
-    isDrainingQueue,
-    isCleaningJobs,
-    isRetryingJobs,
-    changingQueueStatus,
-    isSettingQueueConcurrency,
-    isLoadingJobs,
-    isObliteratingQueue,
     jobsPage,
     jobsSearchQuery,
     jobsStatusFilter,
     pollingIntervalMs,
+    pendingOperation,
     selectedQueue,
   ]);
 
@@ -291,18 +270,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const filterJobsByStatus = async (status: QueueJobStatus | null) => {
-    if (
-      !selectedQueue ||
-      status === jobsStatusFilter ||
-      isLoadingJobs ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isObliteratingQueue
-    ) {
+    if (!selectedQueue || status === jobsStatusFilter || pendingOperation) {
       return;
     }
 
@@ -312,18 +280,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   const searchJobs = async (searchQuery: string) => {
     const query = searchQuery.trim();
 
-    if (
-      !selectedQueue ||
-      query === jobsSearchQuery ||
-      isLoadingJobs ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isObliteratingQueue
-    ) {
+    if (!selectedQueue || query === jobsSearchQuery || pendingOperation) {
       return;
     }
 
@@ -331,18 +288,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const showPreviousJobsPage = async () => {
-    if (
-      !selectedQueue ||
-      jobsPage <= 1 ||
-      isLoadingJobs ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isObliteratingQueue
-    ) {
+    if (!selectedQueue || jobsPage <= 1 || pendingOperation) {
       return;
     }
     await fetchJobs(
@@ -354,18 +300,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const showNextJobsPage = async () => {
-    if (
-      !selectedQueue ||
-      !hasNextJobsPage ||
-      isLoadingJobs ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isObliteratingQueue
-    ) {
+    if (!selectedQueue || !hasNextJobsPage || pendingOperation) {
       return;
     }
     await fetchJobs(
@@ -382,15 +317,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const openJobDetails = async (jobId: string) => {
-    if (
-      !selectedQueue ||
-      deletingJobId ||
-      retryingJobId ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isObliteratingQueue
-    ) {
+    if (!selectedQueue || pendingOperation) {
       return;
     }
 
@@ -411,16 +338,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const deleteJob = async (jobId: string) => {
-    if (
-      !selectedQueue ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isObliteratingQueue
-    ) {
+    if (!selectedQueue || pendingOperation) {
       return;
     }
 
@@ -440,16 +358,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const retryJob = async (jobId: string) => {
-    if (
-      !selectedQueue ||
-      retryingJobId ||
-      deletingJobId ||
-      isAddingJob ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isObliteratingQueue
-    ) {
+    if (!selectedQueue || pendingOperation) {
       return;
     }
 
@@ -458,13 +367,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
 
     try {
       await redisConnection.retryQueueJob(queue, jobId);
-      const result = await redisConnection.getQueueJobs(
-        queue,
-        1,
-        JOBS_PAGE_SIZE,
-        jobsStatusFilter,
-        jobsSearchQuery,
-      );
+      const result = await getCurrentJobs(queue);
       dispatch({ type: "jobRetried", queue, jobId, result });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unknown error";
@@ -477,16 +380,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const addJob = async () => {
-    if (
-      !selectedQueue ||
-      isAddingJob ||
-      deletingJobId ||
-      retryingJobId ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isObliteratingQueue
-    ) {
+    if (!selectedQueue || pendingOperation) {
       return;
     }
 
@@ -524,16 +418,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const obliterateQueue = async () => {
-    if (
-      !selectedQueue ||
-      isObliteratingQueue ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob
-    ) {
+    if (!selectedQueue || pendingOperation) {
       return;
     }
 
@@ -553,16 +438,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const drainQueue = async () => {
-    if (
-      !selectedQueue ||
-      isDrainingQueue ||
-      isObliteratingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob
-    ) {
+    if (!selectedQueue || pendingOperation) {
       return;
     }
 
@@ -571,13 +447,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
 
     try {
       await redisConnection.drainQueue(queue);
-      const result = await redisConnection.getQueueJobs(
-        queue,
-        1,
-        JOBS_PAGE_SIZE,
-        jobsStatusFilter,
-        jobsSearchQuery,
-      );
+      const result = await getCurrentJobs(queue);
       dispatch({ type: "queueDrained", queue, result });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unknown error";
@@ -589,17 +459,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const retryJobs = async (state: RetryableJobState) => {
-    if (
-      !selectedQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isRateLimitingQueue ||
-      isDrainingQueue ||
-      isObliteratingQueue ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob
-    ) {
+    if (!selectedQueue || pendingOperation) {
       return;
     }
 
@@ -608,13 +468,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
 
     try {
       await redisConnection.retryJobs(queue, state);
-      const result = await redisConnection.getQueueJobs(
-        queue,
-        1,
-        JOBS_PAGE_SIZE,
-        jobsStatusFilter,
-        jobsSearchQuery,
-      );
+      const result = await getCurrentJobs(queue);
       dispatch({ type: "jobsRetried", queue, state, result });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unknown error";
@@ -630,19 +484,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
     graceMs: number,
     limit: number,
   ) => {
-    if (
-      !selectedQueue ||
-      isCleaningJobs ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      isRateLimitingQueue ||
-      isSettingQueueConcurrency ||
-      changingQueueStatus ||
-      isObliteratingQueue ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob
-    ) {
+    if (!selectedQueue || pendingOperation) {
       return;
     }
 
@@ -656,16 +498,9 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
         limit,
         status,
       );
-      const [result, meta, counts] = await Promise.all([
-        redisConnection.getQueueJobs(
-          queue,
-          1,
-          JOBS_PAGE_SIZE,
-          jobsStatusFilter,
-          jobsSearchQuery,
-        ),
-        redisConnection.getQueueMeta(queue),
-        redisConnection.getQueueJobCounts(queue),
+      const [result, queueInfo] = await Promise.all([
+        getCurrentJobs(queue),
+        redisConnection.getQueueInfo(queue),
       ]);
       dispatch({
         type: "queueCleaned",
@@ -673,7 +508,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
         status,
         removedCount: removedJobIds.length,
         result,
-        queueInfo: { ...queue, meta, counts },
+        queueInfo,
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unknown error";
@@ -685,15 +520,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const setQueuePaused = async (queue: QueueRef, paused: boolean) => {
-    if (
-      changingQueueStatus ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      isObliteratingQueue ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob
-    ) {
+    if (pendingOperation) {
       return;
     }
 
@@ -701,15 +528,12 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
 
     try {
       await redisConnection.setQueuePaused(queue, paused);
-      const [meta, counts] = await Promise.all([
-        redisConnection.getQueueMeta(queue),
-        redisConnection.getQueueJobCounts(queue),
-      ]);
+      const queueInfo = await redisConnection.getQueueInfo(queue);
       dispatch({
         type: "queueStatusChanged",
         queue,
         paused,
-        queueInfo: { ...queue, meta, counts },
+        queueInfo,
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unknown error";
@@ -722,17 +546,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const rateLimitQueue = async (durationMs: number) => {
-    if (
-      !selectedQueue ||
-      isRateLimitingQueue ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isObliteratingQueue ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob
-    ) {
+    if (!selectedQueue || pendingOperation) {
       return;
     }
 
@@ -752,18 +566,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const setQueueConcurrency = async (concurrency: number) => {
-    if (
-      !selectedQueue ||
-      isSettingQueueConcurrency ||
-      isRateLimitingQueue ||
-      isDrainingQueue ||
-      isRetryingJobs ||
-      changingQueueStatus ||
-      isObliteratingQueue ||
-      deletingJobId ||
-      retryingJobId ||
-      isAddingJob
-    ) {
+    if (!selectedQueue || pendingOperation) {
       return;
     }
 
@@ -772,15 +575,12 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
 
     try {
       await redisConnection.setQueueConcurrency(queue, concurrency);
-      const [meta, counts] = await Promise.all([
-        redisConnection.getQueueMeta(queue),
-        redisConnection.getQueueJobCounts(queue),
-      ]);
+      const queueInfo = await redisConnection.getQueueInfo(queue);
       dispatch({
         type: "queueConcurrencySet",
         queue,
         concurrency,
-        queueInfo: { ...queue, meta, counts },
+        queueInfo,
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unknown error";
@@ -833,7 +633,9 @@ export function useQueueInspect() {
   const context = useContext(QueueInspectContext);
 
   if (!context) {
-    throw new Error("useQueueInspect must be used within QueueInspectProvider.");
+    throw new Error(
+      "useQueueInspect must be used within QueueInspectProvider.",
+    );
   }
 
   return context;

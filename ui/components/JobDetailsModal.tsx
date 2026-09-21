@@ -66,7 +66,7 @@ export function JobDetailsModal() {
     state: {
       selectedJobId,
       selectedJobDetails,
-      isLoadingJobDetails,
+      pendingOperation,
       jobDetailsMessage,
     },
     actions: { closeJobDetails },
@@ -138,7 +138,7 @@ export function JobDetailsModal() {
           </box>
         </box>
 
-        {isLoadingJobDetails ? (
+        {pendingOperation?.type === "jobDetails" ? (
           <box flexGrow={1} alignItems="center" justifyContent="center">
             <text fg="#FACC15">Loading job details...</text>
           </box>

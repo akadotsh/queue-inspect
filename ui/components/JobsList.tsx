@@ -31,9 +31,10 @@ function formatJobData(data: unknown) {
 export function JobSearch() {
   const [jobSearchInput, setJobSearchInput] = useState("");
   const {
-    state: { jobsSearchQuery, isLoadingJobs },
+    state: { jobsSearchQuery, pendingOperation },
     actions: { searchJobs },
   } = useQueueInspect();
+  const isLoadingJobs = pendingOperation?.type === "jobs";
 
   useEffect(() => {
     const query = jobSearchInput.trim();
@@ -94,13 +95,15 @@ type JobCardProps = {
 
 function JobCard({ job, onSelect }: JobCardProps) {
   const {
-    state: { deletingJobId, retryingJobId },
+    state: { pendingOperation },
     actions: { deleteJob, retryJob, openJobDetails },
   } = useQueueInspect();
   const json = formatJobData(job.data);
   const jsonHeight = json.split("\n").length;
-  const isDeleting = deletingJobId === job.id;
-  const isRetrying = retryingJobId === job.id;
+  const isDeleting =
+    pendingOperation?.type === "deleteJob" && pendingOperation.jobId === job.id;
+  const isRetrying =
+    pendingOperation?.type === "retryJob" && pendingOperation.jobId === job.id;
   const canRetry = job.status === "failed" || job.status === "completed";
 
   const selectJob = () => {
@@ -194,8 +197,9 @@ function EmptyJobs() {
 
 export function JobResults({ onSelectJob }: { onSelectJob: () => void }) {
   const {
-    state: { jobs, isLoadingJobs },
+    state: { jobs, pendingOperation },
   } = useQueueInspect();
+  const isLoadingJobs = pendingOperation?.type === "jobs";
 
   if (isLoadingJobs && jobs.length === 0) {
     return (
@@ -232,9 +236,10 @@ export function JobResults({ onSelectJob }: { onSelectJob: () => void }) {
 
 export function JobsPagination() {
   const {
-    state: { jobsPage, hasNextJobsPage, isLoadingJobs },
+    state: { jobsPage, hasNextJobsPage, pendingOperation },
     actions: { showPreviousJobsPage, showNextJobsPage },
   } = useQueueInspect();
+  const isLoadingJobs = pendingOperation?.type === "jobs";
   const canShowPreviousPage = jobsPage > 1 && !isLoadingJobs;
   const canShowNextPage = hasNextJobsPage && !isLoadingJobs;
 
@@ -292,10 +297,10 @@ function isSuccessMessage(message: string) {
 
 export function JobsFeedback() {
   const {
-    state: { isLoadingJobs, jobsMessage },
+    state: { pendingOperation, jobsMessage },
   } = useQueueInspect();
 
-  if (isLoadingJobs || !jobsMessage) return null;
+  if (pendingOperation?.type === "jobs" || !jobsMessage) return null;
 
   return (
     <text fg={isSuccessMessage(jobsMessage) ? "#4ADE80" : "#FB7185"}>
