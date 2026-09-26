@@ -65,7 +65,8 @@ function QueueInfoPopover({ isOpen }: { isOpen: boolean }) {
   if (!isOpen || !selectedQueue) return null;
 
   const queueInfo = queues.find(
-    (queue) =>
+    (queue): queue is JobCounts =>
+      queue.backend === "bullmq" &&
       queue.name === selectedQueue.name &&
       queue.prefix === selectedQueue.prefix,
   );
@@ -555,7 +556,8 @@ function QueueOptions({
   if (!selectedQueue) return null;
 
   const queueInfo = queues.find(
-    (queue) =>
+    (queue): queue is JobCounts =>
+      queue.backend === "bullmq" &&
       queue.name === selectedQueue.name &&
       queue.prefix === selectedQueue.prefix,
   );

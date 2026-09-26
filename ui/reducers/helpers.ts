@@ -2,6 +2,7 @@ import type {
   QueueJobsPage,
   QueueJobSummary,
   QueueRef,
+  QueueInfo,
 } from "../../server/index";
 
 export function jobsPageState(result: QueueJobsPage) {
@@ -13,8 +14,15 @@ export function jobsPageState(result: QueueJobsPage) {
   };
 }
 
-export function isSameQueue(left: QueueRef | null, right: QueueRef) {
-  return left?.name === right.name && left.prefix === right.prefix;
+export function isSameQueue(
+  left: QueueInfo | QueueRef | null,
+  right: QueueRef,
+) {
+  return (
+    left?.backend === "bullmq" &&
+    left.name === right.name &&
+    left.prefix === right.prefix
+  );
 }
 
 export function jobMatchesSearch(job: QueueJobSummary, searchQuery: string) {

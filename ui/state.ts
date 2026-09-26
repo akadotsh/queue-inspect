@@ -5,14 +5,15 @@ import type {
   QueueJobsPage,
   QueueJobSummary,
   QueueRef,
+  QueueInfo,
   RetryableJobState,
   CleanableJobStatus,
 } from "../server/index";
 
 export type AppState = {
-  redisUrl: string;
+  connectionUrl: string;
   pollingIntervalMs: number;
-  queues: JobCounts[];
+  queues: QueueInfo[];
   selectedQueue: QueueRef | null;
   jobs: QueueJobSummary[];
   jobsPage: number;
@@ -48,14 +49,14 @@ export type PendingOperation =
   | null;
 
 export type AppAction =
-  | { type: "redisUrlChanged"; value: string }
+  | { type: "connectionUrlChanged"; value: string }
   | { type: "pollingIntervalChanged"; value: number }
   | { type: "messageSet"; message: string }
-  | { type: "connected"; redisUrl: string }
+  | { type: "connected"; connectionUrl: string }
   | { type: "disconnected" }
   | { type: "queuesLoading" }
-  | { type: "queuesLoaded"; queues: JobCounts[] }
-  | { type: "queuesRefreshed"; queues: JobCounts[] }
+  | { type: "queuesLoaded"; queues: QueueInfo[] }
+  | { type: "queuesRefreshed"; queues: QueueInfo[] }
   | { type: "queuesFailed"; message: string }
   | {
       type: "jobsLoading";
@@ -144,7 +145,7 @@ export type AppAction =
 
 export function createInitialState(isConnected: boolean): AppState {
   return {
-    redisUrl: "",
+    connectionUrl: "",
     pollingIntervalMs: 5_000,
     queues: [],
     selectedQueue: null,
