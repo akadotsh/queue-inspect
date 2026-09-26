@@ -1,11 +1,11 @@
 # Queue Inspect
 
-Queue Inspect is a terminal interface for inspecting and managing BullMQ queues
-in Redis.
+Queue Inspect is a terminal interface for inspecting BullMQ and RabbitMQ queues.
 
 ## Features
 
 - Connect to Redis and discover BullMQ queues.
+- Connect to the RabbitMQ Management API and inspect queue metrics.
 - Browse, filter, and monitor queues and jobs with automatic refresh.
 - View and set global queue concurrency.
 - Search jobs by ID or name and inspect job details and logs.
@@ -16,12 +16,13 @@ in Redis.
 
 - Bun and TypeScript
 - React and OpenTUI
-- BullMQ and Redis
+- BullMQ, Redis, and the RabbitMQ Management API
 
 ## Requirements
 
 - [Bun](https://bun.sh/) 1.4 or later.
-- A running Redis instance containing the BullMQ queues you want to manage.
+- A running Redis instance containing BullMQ queues, or a RabbitMQ instance with
+  the management plugin enabled.
 
 Redis commonly listens on port `6379`. Queue Inspect connects to Redis but does
 not start or manage the Redis server itself. For a local, unsecured Redis
@@ -74,9 +75,18 @@ bun run start
 Enter the Redis URL on the connection screen and press Enter. Queue Inspect
 discovers BullMQ queues from that Redis instance automatically.
 
+For RabbitMQ, enter the Management API base URL with HTTP Basic credentials:
+
+```text
+http://guest:guest@localhost:15672
+```
+
+Initial RabbitMQ support is read-only and shows queue depth, ready and
+unacknowledged messages, consumers, durability, and state.
+
 > [!CAUTION]
 > Queue Inspect can modify queues and jobs. Cleaning, emptying, deleting, and
-> obliterating data can be destructive, so verify the Redis connection before
+> obliterating data can be destructive, so verify the connection before
 > confirming those actions.
 
 ## Development
