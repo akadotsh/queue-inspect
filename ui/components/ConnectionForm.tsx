@@ -2,8 +2,8 @@ import { useQueueInspect } from "../provider";
 
 export function ConnectionForm() {
   const {
-    state: { redisUrl, message },
-    actions: { setRedisUrl, connect },
+    state: { connectionUrl, message },
+    actions: { setConnectionUrl, connect },
   } = useQueueInspect();
 
   return (
@@ -13,6 +13,8 @@ export function ConnectionForm() {
       backgroundColor="#000000"
       alignItems="center"
       justifyContent="center"
+      flexDirection="column"
+      gap={1}
     >
       <box
         width={64}
@@ -24,20 +26,15 @@ export function ConnectionForm() {
         gap={1}
       >
         <text fg="#8EA2C9">QUEUE INSPECT</text>
-        <text fg="#F3F6FF">Connect to Redis</text>
-        <text fg="#8290AA">
-          Enter the URL for the Redis instance you want to inspect.
-        </text>
-
-        <text fg="#C7D2E9">Redis URL</text>
+        <text fg="#F3F6FF">Connect to a queue backend</text>
         <box border borderColor="#3B82F6" paddingLeft={1} paddingRight={1}>
           <input
-            value={redisUrl}
-            placeholder="redis://localhost:6379"
+            value={connectionUrl}
+            placeholder="Connection URL"
             placeholderColor="#59677F"
             textColor="#F3F6FF"
             focused
-            onInput={setRedisUrl}
+            onInput={setConnectionUrl}
             onSubmit={connect}
           />
         </box>
@@ -54,13 +51,14 @@ export function ConnectionForm() {
         </box>
 
         {message ? (
-          <text fg={message === "Connecting to Redis..." ? "#FACC15" : "#FB7185"}>
+          <text fg={message === "Connecting..." ? "#FACC15" : "#FB7185"}>
             {message}
           </text>
         ) : (
           <text fg="#59677F">Press Enter or click Submit · Ctrl+C to quit</text>
         )}
       </box>
+      <text fg="#59677F">Supported: BullMQ · RabbitMQ</text>
     </box>
   );
 }

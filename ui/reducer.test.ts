@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { JobCounts, QueueJobsPage, QueueRef } from "../server/index";
 import { createInitialState, reducer } from "./reducer";
 
-const queue: QueueRef = { name: "emails", prefix: "bull" };
+const queue: QueueRef = { backend: "bullmq", name: "emails", prefix: "bull" };
 
 function createQueueInfo(concurrency?: number): JobCounts {
   return {

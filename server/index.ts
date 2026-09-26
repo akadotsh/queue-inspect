@@ -8,8 +8,23 @@ import {
 } from "bullmq";
 
 export type QueueRef = {
+  backend: "bullmq";
   name: string;
   prefix: string;
+};
+
+export type RabbitQueueInfo = {
+  backend: "rabbitmq";
+  name: string;
+  vhost: string;
+  state: string;
+  durable: boolean;
+  consumers: number;
+  counts: {
+    total: number;
+    ready: number;
+    unacknowledged: number;
+  };
 };
 
 export const queueJobStatuses = [
@@ -36,6 +51,8 @@ export type JobCounts = QueueRef & {
   meta: QueueMeta;
   counts: Record<QueueJobStatus, number>;
 };
+
+export type QueueInfo = JobCounts | RabbitQueueInfo;
 
 export type QueueJobSummary = {
   id: string;
@@ -185,7 +202,11 @@ class RedisConnection {
         if (match?.[1] && match[2]) {
           const prefix = match[1];
           const name = match[2];
-          queues.set(`${prefix}:${name}`, { prefix, name });
+          queues.set(`${prefix}:${name}`, {
+            backend: "bullmq",
+            prefix,
+            name,
+          });
         }
       }
     } while (cursor !== "0");
@@ -544,3 +565,181 @@ class RedisConnection {
 }
 
 export const redisConnection = new RedisConnection();
+
+type RabbitQueuePage = {
+  items: unknown[];
+  page_count?: unknown;
+};
+
+function rabbitQueueInfo(value: unknown): RabbitQueueInfo {
+  if (!value || typeof value !== "object") {
+    throw new Error("RabbitMQ returned an invalid queue.");
+  }
+
+  const queue = value as Record<string, unknown>;
+  if (typeof queue.name !== "string" || typeof queue.vhost !== "string") {
+    throw new Error("RabbitMQ returned an invalid queue.");
+  }
+  const count = (field: string) =>
+    typeof queue[field] === "number" && Number.isFinite(queue[field])
+      ? queue[field]
+      : 0;
+
+  return {
+    backend: "rabbitmq",
+    name: queue.name,
+    vhost: queue.vhost,
+    state: typeof queue.state === "string" ? queue.state : "unknown",
+    durable: queue.durable === true,
+    consumers: count("consumers"),
+    counts: {
+      total: count("messages"),
+      ready: count("messages_ready"),
+      unacknowledged: count("messages_unacknowledged"),
+    },
+  };
+}
+
+export class RabbitConnection {
+  isConnected = false;
+  private baseUrl: URL | null = null;
+  private authorization: string | null = null;
+
+  constructor(private fetcher: typeof fetch = fetch) {}
+
+  private async request(path: string) {
+    if (!this.baseUrl) throw new Error("Connect to RabbitMQ first.");
+
+    const basePath = this.baseUrl.pathname.replace(/\/$/, "");
+    const url = new URL(`${basePath}/api/${path}`, this.baseUrl);
+    const response = await this.fetcher(url, {
+      headers: this.authorization
+        ? { Authorization: this.authorization }
+        : undefined,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `RabbitMQ API returned ${response.status} ${response.statusText}.`,
+      );
+    }
+
+    return response.json() as Promise<unknown>;
+  }
+
+  async connect(value: string) {
+    const url = new URL(value);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error(
+        "RabbitMQ Management URLs must start with http:// or https://",
+      );
+    }
+
+    this.authorization =
+      url.username || url.password
+        ? `Basic ${Buffer.from(`${decodeURIComponent(url.username)}:${decodeURIComponent(url.password)}`).toString("base64")}`
+        : null;
+    url.username = "";
+    url.password = "";
+    this.baseUrl = url;
+
+    try {
+      await this.request("overview");
+      this.isConnected = true;
+    } catch (error) {
+      this.baseUrl = null;
+      this.authorization = null;
+      throw error;
+    }
+  }
+
+  async disconnect() {
+    this.baseUrl = null;
+    this.authorization = null;
+    this.isConnected = false;
+  }
+
+  async getQueues(): Promise<RabbitQueueInfo[]> {
+    const queues: unknown[] = [];
+    let page = 1;
+    let pageCount = 1;
+
+    do {
+      const result = await this.request(
+        `queues?page=${page}&page_size=500&pagination=true&disable_stats=true&enable_queue_totals=true`,
+      );
+
+      if (Array.isArray(result)) {
+        queues.push(...result);
+        break;
+      }
+
+      if (!result || typeof result !== "object" || !("items" in result)) {
+        throw new Error("RabbitMQ returned an invalid queue list.");
+      }
+
+      const queuePage = result as RabbitQueuePage;
+      if (!Array.isArray(queuePage.items)) {
+        throw new Error("RabbitMQ returned an invalid queue list.");
+      }
+      queues.push(...queuePage.items);
+      pageCount =
+        typeof queuePage.page_count === "number" &&
+        Number.isInteger(queuePage.page_count) &&
+        queuePage.page_count >= page
+          ? queuePage.page_count
+          : page;
+      page += 1;
+    } while (page <= pageCount);
+
+    return queues
+      .map(rabbitQueueInfo)
+      .sort(
+        (left, right) =>
+          left.vhost.localeCompare(right.vhost) ||
+          left.name.localeCompare(right.name),
+      );
+  }
+}
+
+const rabbitConnection = new RabbitConnection();
+
+class QueueConnection {
+  private active: RedisConnection | RabbitConnection | null = null;
+
+  get isConnected() {
+    return this.active?.isConnected ?? false;
+  }
+
+  async connect(url: string) {
+    const next =
+      url.startsWith("redis://") || url.startsWith("rediss://")
+        ? redisConnection
+        : url.startsWith("http://") || url.startsWith("https://")
+          ? rabbitConnection
+          : null;
+
+    if (!next) {
+      throw new Error(
+        "Use a redis:// URL for BullMQ or an http(s):// Management URL for RabbitMQ.",
+      );
+    }
+
+    await this.active?.disconnect();
+    await next.connect(url);
+    this.active = next;
+  }
+
+  async disconnect() {
+    await this.active?.disconnect();
+    this.active = null;
+  }
+
+  async getQueues(): Promise<QueueInfo[]> {
+    if (!this.active) throw new Error("Connect to a queue backend first.");
+    return this.active.getQueues();
+  }
+}
+
+export const queueConnection = new QueueConnection();

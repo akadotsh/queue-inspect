@@ -7,6 +7,7 @@ import {
   type PropsWithChildren,
 } from "react";
 import {
+  queueConnection,
   redisConnection,
   type CleanableJobStatus,
   type QueueJobStatus,
@@ -21,7 +22,7 @@ import {
 } from "./reducer";
 
 type QueueInspectActions = {
-  setRedisUrl: (value: string) => void;
+  setConnectionUrl: (value: string) => void;
   setPollingInterval: (value: number) => void;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
@@ -81,7 +82,7 @@ async function refreshQueuesAndJobs(
   isActive: () => boolean,
   dispatch: Dispatch<AppAction>,
 ) {
-  const queues = await redisConnection.getQueues();
+  const queues = await queueConnection.getQueues();
 
   if (!isActive()) return;
   dispatch({ type: "queuesRefreshed", queues });
@@ -91,6 +92,7 @@ async function refreshQueuesAndJobs(
 
   const queueStillExists = queues.some(
     (queue) =>
+      queue.backend === "bullmq" &&
       queue.name === selectedQueue.name &&
       queue.prefix === selectedQueue.prefix,
   );
@@ -115,11 +117,11 @@ async function refreshQueuesAndJobs(
 export function QueueInspectProvider({ children }: PropsWithChildren) {
   const [state, dispatch] = useReducer(
     reducer,
-    redisConnection.isConnected,
+    queueConnection.isConnected,
     createInitialState,
   );
   const {
-    redisUrl,
+    connectionUrl,
     pollingIntervalMs,
     selectedQueue,
     jobsPage,
@@ -184,7 +186,7 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   const fetchQueues = async () => {
     try {
       dispatch({ type: "queuesLoading" });
-      const queues = await redisConnection.getQueues();
+      const queues = await queueConnection.getQueues();
       dispatch({ type: "queuesLoaded", queues });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unknown error";
@@ -196,38 +198,33 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const connect = async () => {
-    const url = redisUrl.trim();
+    const url = connectionUrl.trim();
 
     if (!url) {
-      dispatch({ type: "messageSet", message: "Please enter a Redis URL." });
-      return;
-    }
-
-    if (!url.startsWith("redis://") && !url.startsWith("rediss://")) {
       dispatch({
         type: "messageSet",
-        message: "Redis URLs must start with redis:// or rediss://",
+        message: "Please enter a connection URL.",
       });
       return;
     }
 
     try {
-      dispatch({ type: "messageSet", message: "Connecting to Redis..." });
-      await redisConnection.connect(url);
-      dispatch({ type: "connected", redisUrl: url });
+      dispatch({ type: "messageSet", message: "Connecting..." });
+      await queueConnection.connect(url);
+      dispatch({ type: "connected", connectionUrl: url });
       await fetchQueues();
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unknown error";
       dispatch({
         type: "messageSet",
-        message: `Could not connect to Redis: ${reason}`,
+        message: `Could not connect: ${reason}`,
       });
     }
   };
 
   const disconnect = async () => {
     try {
-      await redisConnection.disconnect();
+      await queueConnection.disconnect();
       dispatch({ type: "disconnected" });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Unknown error";
@@ -592,7 +589,8 @@ export function QueueInspectProvider({ children }: PropsWithChildren) {
   };
 
   const actions: QueueInspectActions = {
-    setRedisUrl: (value) => dispatch({ type: "redisUrlChanged", value }),
+    setConnectionUrl: (value) =>
+      dispatch({ type: "connectionUrlChanged", value }),
     setPollingInterval: (value) =>
       dispatch({ type: "pollingIntervalChanged", value }),
     connect,
